@@ -2,11 +2,15 @@
   "name": "correspondence-board-game",
   "version": "1.0.0",
   "description": "A webserver for asynchronous correspondence board games",
-  "main": "src/server.js",
+  "main": "src/server-new.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "start": "node src/server-new.js",
+    "start:legacy": "node src/server.js",
+    "dev": "nodemon src/server-new.js",
+    "dev:legacy": "nodemon src/server.js",
     "test": "jest tests/blackbox-simple.test.js",
+    "test:architecture": "jest tests/architecture.test.js",
+    "test:all": "jest",
     "lint": "eslint src/",
     "format": "prettier --write src/"
   },
