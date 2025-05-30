@@ -21,22 +21,25 @@ class SqliteGameRepository extends GameRepository {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `;
 
-      const boardStateJson = typeof game.boardState === 'string' 
-        ? game.boardState 
-        : JSON.stringify(game.boardState);
+      // Handle both domain Game objects and plain objects
+      const gameData = game.toObject ? game.toObject() : game;
+      
+      const boardStateJson = typeof gameData.boardState === 'string' 
+        ? gameData.boardState 
+        : JSON.stringify(gameData.boardState);
 
       db.run(query, [
-        game.id,
-        game.name,
-        game.gameType,
-        game.status,
-        game.currentPlayerId,
+        gameData.id,
+        gameData.name,
+        gameData.gameType,
+        gameData.status,
+        gameData.currentPlayerId,
         boardStateJson,
-        game.moveCount,
-        game.minPlayers,
-        game.maxPlayers,
-        JSON.stringify(game.settings || {}),
-        game.createdAt
+        gameData.moveCount,
+        gameData.minPlayers,
+        gameData.maxPlayers,
+        JSON.stringify(gameData.settings || {}),
+        gameData.createdAt
       ], function(err) {
         if (err) {
           reject(err);
@@ -144,12 +147,12 @@ class SqliteGameRepository extends GameRepository {
 
       const query = `UPDATE games SET ${fields.join(', ')} WHERE id = ?`;
 
-      db.run(query, params, function(err) {
+      db.run(query, params, (err) => {
         if (err) {
           reject(err);
         } else {
           // Return updated game
-          resolve(this.findById(gameId));
+          this.findById(gameId).then(resolve).catch(reject);
         }
       });
     });

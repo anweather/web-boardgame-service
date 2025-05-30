@@ -21,20 +21,21 @@ describe('Ports and Adapters Architecture Tests', () => {
     const gameService = dependencies.getGameService();
 
     // Test user creation through domain service
+    const timestamp = Date.now();
     const user = await userService.createUser({
-      username: 'testuser_arch',
-      email: 'test@arch.com',
+      username: `testuser_arch_${timestamp}`,
+      email: `test_${timestamp}@arch.com`,
       password: 'password123'
     });
 
     expect(user).toBeDefined();
-    expect(user.username).toBe('testuser_arch');
-    expect(user.email).toBe('test@arch.com');
+    expect(user.username).toBe(`testuser_arch_${timestamp}`);
+    expect(user.email).toBe(`test_${timestamp}@arch.com`);
 
     // Test authentication through domain service
-    const authResult = await userService.authenticateUser('testuser_arch', 'password123');
+    const authResult = await userService.authenticateUser(`testuser_arch_${timestamp}`, 'password123');
     expect(authResult.success).toBe(true);
-    expect(authResult.user.username).toBe('testuser_arch');
+    expect(authResult.user.username).toBe(`testuser_arch_${timestamp}`);
 
     // Test game creation through domain service
     const game = await gameService.createGame({
@@ -55,30 +56,34 @@ describe('Ports and Adapters Architecture Tests', () => {
     const gameRepository = dependencies.getGameRepository();
     const userRepository = dependencies.getUserRepository();
 
-    // Test user repository
+    // Test user repository with unique identifiers
+    const timestamp = Date.now();
     const userData = {
-      username: 'repo_test_user',
-      email: 'repo@test.com',
+      username: `repo_test_user_${timestamp}`,
+      email: `repo_${timestamp}@test.com`,
       password: 'password123'
     };
 
     const savedUser = await userRepository.create(userData);
     expect(savedUser).toBeDefined();
-    expect(savedUser.username).toBe('repo_test_user');
+    expect(savedUser.username).toBe(`repo_test_user_${timestamp}`);
 
     const retrievedUser = await userRepository.findById(savedUser.id);
     expect(retrievedUser).toBeDefined();
-    expect(retrievedUser.username).toBe('repo_test_user');
+    expect(retrievedUser.username).toBe(`repo_test_user_${timestamp}`);
 
     // Test game repository
-    const gameData = {
+    const Game = require('../src/domain/Game');
+    const gameData = new Game({
       id: 'test-game-123',
       name: 'Repository Test Game',
       gameType: 'chess',
       status: 'waiting',
-      boardState: JSON.stringify({ test: 'data' }),
+      boardState: { test: 'data' },
+      minPlayers: 2,
+      maxPlayers: 2,
       settings: { timeLimit: 30 }
-    };
+    });
 
     const savedGame = await gameRepository.save(gameData);
     expect(savedGame).toBeDefined();
@@ -124,9 +129,10 @@ describe('Ports and Adapters Architecture Tests', () => {
     const userService = dependencies.getUserService();
 
     // Create a user for notifications
+    const timestamp = Date.now();
     const user = await userService.createUser({
-      username: 'notification_user',
-      email: 'notifications@test.com',
+      username: `notification_user_${timestamp}`,
+      email: `notifications_${timestamp}@test.com`,
       password: 'password123'
     });
 

@@ -16,7 +16,7 @@ class SqliteUserRepository extends UserRepository {
       id: userData.id || uuidv4(),
       username: userData.username,
       email: userData.email,
-      passwordHash: userData.password ? await bcrypt.hash(userData.password, 10) : null
+      passwordHash: userData.passwordHash || (userData.password ? await bcrypt.hash(userData.password, 10) : 'placeholder')
     });
     
     return new Promise((resolve, reject) => {
@@ -29,13 +29,8 @@ class SqliteUserRepository extends UserRepository {
         if (err) {
           reject(err);
         } else {
-          // Return user without password hash
-          const safeUser = new User({
-            id: user.id,
-            username: user.username,
-            email: user.email
-          });
-          resolve(safeUser);
+          // Return user entity
+          resolve(user);
         }
       });
     });
