@@ -27,6 +27,9 @@ class HttpUserController {
    * @private
    */
   _setupRoutes() {
+    // Get all users (for admin panel)
+    this.router.get('/', this._getAllUsers.bind(this));
+    
     // Register a new user
     this.router.post('/register', this._registerUser.bind(this));
     
@@ -44,6 +47,27 @@ class HttpUserController {
     
     // Mark notification as read
     this.router.put('/notifications/:notificationId/read', this._markNotificationAsRead.bind(this));
+  }
+
+  /**
+   * Get all users (for admin panel)
+   */
+  async _getAllUsers(req, res) {
+    try {
+      const users = await this.userService.getAllUsers();
+      
+      res.json(users.map(user => ({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        createdAt: user.createdAt,
+        lastActive: user.lastActive,
+        gamesPlayed: user.gamesPlayed || 0
+      })));
+    } catch (error) {
+      console.error('Error fetching all users:', error);
+      res.status(500).json({ error: 'Failed to fetch users' });
+    }
   }
 
   /**

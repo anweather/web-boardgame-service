@@ -54,6 +54,38 @@ class SqliteUserRepository extends UserRepository {
     });
   }
 
+  async findAll(options = {}) {
+    const db = getDatabase();
+    const limit = options.limit || 100;
+    const offset = options.offset || 0;
+    
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT u.*, 
+               COUNT(DISTINCT gp.game_id) as games_played
+        FROM users u
+        LEFT JOIN game_players gp ON u.id = gp.user_id
+        GROUP BY u.id
+        ORDER BY u.created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+      
+      db.all(query, [limit, offset], (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          const users = rows.map(row => {
+            const user = this._mapRowToUser(row, false);
+            // Add games played count
+            user.gamesPlayed = row.games_played || 0;
+            return user;
+          });
+          resolve(users);
+        }
+      });
+    });
+  }
+
   async findByUsername(username) {
     const db = getDatabase();
     

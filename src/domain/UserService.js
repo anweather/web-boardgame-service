@@ -73,6 +73,18 @@ class UserService {
   }
 
   /**
+   * Get all users (for admin functionality)
+   * @param {Object} options - Query options
+   * @param {number} options.limit - Maximum number of users to return
+   * @param {number} options.offset - Number of users to skip
+   * @returns {Promise<Array<User>>} Array of user entities
+   */
+  async getAllUsers(options = {}) {
+    const usersData = await this.userRepository.findAll(options);
+    return usersData.map(userData => User.fromObject(userData));
+  }
+
+  /**
    * Find user by ID (alias for getUserById)
    * @param {string} userId - User ID
    * @returns {Promise<User|null>} User entity or null

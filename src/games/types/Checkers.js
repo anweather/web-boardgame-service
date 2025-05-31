@@ -1,7 +1,7 @@
 const BoardGame = require('../BoardGame');
 
 class Checkers extends BoardGame {
-  static GAME_TYPE_NAME = 'checkers';
+  static GAME_TYPE_NAME = 'Checkers';
   static GAME_DESCRIPTION = 'Classic two-player checkers/draughts game';
   static MIN_PLAYERS = 2;
   static MAX_PLAYERS = 2;

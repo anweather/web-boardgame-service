@@ -1,7 +1,7 @@
 const BoardGame = require('../BoardGame');
 
 class Chess extends BoardGame {
-  static GAME_TYPE_NAME = 'chess';
+  static GAME_TYPE_NAME = 'Chess';
   static GAME_DESCRIPTION = 'Classic two-player chess game';
   static MIN_PLAYERS = 2;
   static MAX_PLAYERS = 2;

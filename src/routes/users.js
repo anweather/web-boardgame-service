@@ -6,6 +6,42 @@ const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
+// Get all users (for admin panel)
+router.get('/', async (req, res) => {
+  try {
+    const { getDatabase } = require('../database/init');
+    const db = getDatabase();
+    
+    const users = await new Promise((resolve, reject) => {
+      const query = `
+        SELECT u.*, 
+               COUNT(DISTINCT gp.game_id) as games_played
+        FROM users u
+        LEFT JOIN game_participants gp ON u.id = gp.user_id
+        GROUP BY u.id
+        ORDER BY u.created_at DESC
+      `;
+      
+      db.all(query, [], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+
+    res.json(users.map(user => ({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      createdAt: user.created_at,
+      lastActive: user.last_active,
+      gamesPlayed: user.games_played || 0
+    })));
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
 // Register a new user
 router.post('/register', async (req, res) => {
   try {
