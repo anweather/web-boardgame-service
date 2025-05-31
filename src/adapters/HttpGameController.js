@@ -60,18 +60,8 @@ class HttpGameController {
         return res.status(400).json({ error: 'Name and creatorId are required' });
       }
 
-      // For admin panel, allow creating an admin user if it doesn't exist
-      let creator = await this.userService.findUserById(creatorId);
-      if (!creator && creatorId === 'admin') {
-        // Create admin user for admin panel
-        creator = await this.userService.createUser({
-          id: 'admin',
-          username: 'admin',
-          email: 'admin@localhost',
-          password: 'admin123' // This is just for admin panel functionality
-        });
-      }
-      
+      // Validate creator exists
+      const creator = await this.userService.findUserById(creatorId);
       if (!creator) {
         return res.status(404).json({ error: 'Creator not found' });
       }
