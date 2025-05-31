@@ -245,6 +245,52 @@ class GameService {
   }
 
   /**
+   * Find games by criteria
+   * @param {Object} criteria - Search criteria
+   * @returns {Promise<Array>} Array of games
+   */
+  async findGames(criteria = {}) {
+    return await this.gameRepository.findByCriteria(criteria);
+  }
+
+  /**
+   * Get game by ID
+   * @param {string} gameId - Game ID
+   * @returns {Promise<Object|null>} Game or null if not found
+   */
+  async getGameById(gameId) {
+    return await this.gameRepository.findById(gameId);
+  }
+
+  /**
+   * Join a game
+   * @param {string} gameId - Game ID
+   * @param {string} playerId - Player ID
+   * @returns {Promise<Object>} Join result
+   */
+  async joinGame(gameId, playerId) {
+    return await this.addPlayerToGame(gameId, playerId);
+  }
+
+  /**
+   * Get move history for a game
+   * @param {string} gameId - Game ID
+   * @returns {Promise<Array>} Array of moves
+   */
+  async getMoveHistory(gameId) {
+    return await this.gameRepository.getMoves(gameId);
+  }
+
+  /**
+   * Get players for a game
+   * @param {string} gameId - Game ID
+   * @returns {Promise<Array>} Array of players
+   */
+  async getGamePlayers(gameId) {
+    return await this.gameRepository.getPlayers(gameId);
+  }
+
+  /**
    * Validate game configuration
    * @param {string} gameType - Game type
    * @param {Object} settings - Game settings

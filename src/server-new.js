@@ -28,6 +28,9 @@ app.use(cors());
 app.use(morgan('combined'));
 app.use(express.json());
 
+// Serve static files from public directory
+app.use(express.static('public'));
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
