@@ -59,14 +59,32 @@ A Node.js/Express webserver for asynchronous correspondence board games. Support
 
 ## Architecture
 
-- **Models**: User.js, Game.js handle database operations
-- **Routes**: games.js, users.js, gameTypes.js define API endpoints  
-- **Services**: svgBoardRenderer.js (SVG to PNG generation), notifications.js (alerts)
-- **Games**: Abstract BoardGame class with game-specific implementations (Chess, Checkers, Hearts)
-- **Factory**: GameFactory manages game type registration and creation
-- **Database**: SQLite with schema supporting 1-10 players per game
+**Ports and Adapters (Hexagonal) Architecture:**
+
+- **Domain Layer**: Core business logic
+  - `GameService.js` - Game business operations
+  - `UserService.js` - User management operations
+  - `Game.js` - Game domain entity
+  - `User.js` - User domain entity
+  - `GamePluginRegistry.js` - Plugin system for game types
+  
+- **Adapters Layer**: External interfaces
+  - `HttpGameController.js` - HTTP API for games
+  - `HttpUserController.js` - HTTP API for users  
+  - `SqliteGameRepository.js` - Game data persistence
+  - `SqliteUserRepository.js` - User data persistence
+  - `SqliteNotificationService.js` - Real-time notifications
+  
+- **Infrastructure**:
+  - `server.js` - Express server setup with dependency injection
+  - `dependencies.js` - Dependency injection container
+  - `svgBoardRenderer.js` - Board image generation
+  - SQLite database with clean schema
+  - Socket.IO for real-time updates
+
+- **Game Types**: Plugin-based system supporting Chess, Checkers, Hearts
 - **Real-time**: Socket.IO for game events and notifications
-- **Auth**: JWT tokens for user authentication
+- **Auth**: Simple user authentication system
 
 ## Game Types
 

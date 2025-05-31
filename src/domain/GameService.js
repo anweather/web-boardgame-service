@@ -400,6 +400,43 @@ class GameService {
       }
     }
   }
+
+  /**
+   * Force start a game (admin feature)
+   * @param {string} gameId - Game ID
+   * @returns {Promise<Object>} Result with first player ID
+   */
+  async forceStartGame(gameId) {
+    const game = await this.gameRepository.findById(gameId);
+    if (!game) {
+      throw new Error('Game not found');
+    }
+
+    if (game.status === 'active') {
+      throw new Error('Game is already active');
+    }
+
+    const players = await this.gameRepository.getPlayers(gameId);
+    if (players.length < 2) {
+      throw new Error('Game needs at least 2 players to start');
+    }
+
+    // Set first player as current player
+    const firstPlayerId = players[0].user_id;
+    
+    // Update game status to active
+    const updatedGame = await this.gameRepository.update(gameId, {
+      status: 'active',
+      currentPlayerId: firstPlayerId
+    });
+
+    return {
+      success: true,
+      firstPlayerId,
+      playerCount: players.length,
+      game: updatedGame
+    };
+  }
 }
 
 module.exports = GameService;

@@ -136,6 +136,21 @@ class SqliteGameRepository extends GameRepository {
         } else if (key === 'moveCount') {
           fields.push('move_count = ?');
           params.push(updates[key]);
+        } else if (key === 'gameType') {
+          fields.push('game_type = ?');
+          params.push(updates[key]);
+        } else if (key === 'minPlayers') {
+          fields.push('min_players = ?');
+          params.push(updates[key]);
+        } else if (key === 'maxPlayers') {
+          fields.push('max_players = ?');
+          params.push(updates[key]);
+        } else if (key === 'createdAt') {
+          fields.push('created_at = ?');
+          params.push(updates[key]);
+        } else if (key === 'updatedAt') {
+          fields.push('updated_at = ?');
+          params.push(updates[key]);
         } else {
           fields.push(`${key} = ?`);
           params.push(updates[key]);
@@ -255,7 +270,7 @@ class SqliteGameRepository extends GameRepository {
         : JSON.stringify(boardStateAfter);
       
       const query = `
-        INSERT INTO moves (id, game_id, player_id, move_data, board_state_after, move_number)
+        INSERT INTO moves (id, game_id, user_id, move_notation, board_state_after, move_number)
         VALUES (?, ?, ?, ?, ?, ?)
       `;
 
@@ -291,7 +306,7 @@ class SqliteGameRepository extends GameRepository {
       const query = `
         SELECT m.*, u.username 
         FROM moves m 
-        JOIN users u ON m.player_id = u.id 
+        JOIN users u ON m.user_id = u.id 
         WHERE m.game_id = ? 
         ORDER BY m.move_number
       `;
@@ -303,12 +318,12 @@ class SqliteGameRepository extends GameRepository {
           const moves = rows.map(row => ({
             id: row.id,
             gameId: row.game_id,
-            playerId: row.player_id,
+            playerId: row.user_id,
             username: row.username,
-            move: JSON.parse(row.move_data),
+            move: JSON.parse(row.move_notation),
             boardStateAfter: row.board_state_after,
             moveNumber: row.move_number,
-            timestamp: row.created_at
+            timestamp: row.timestamp
           }));
           resolve(moves);
         }

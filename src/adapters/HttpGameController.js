@@ -47,6 +47,9 @@ class HttpGameController {
     
     // Get game move history
     this.router.get('/:id/moves', this._getMoveHistory.bind(this));
+    
+    // Force start a game (admin feature)
+    this.router.post('/:id/force-start', this._forceStartGame.bind(this));
   }
 
   /**
@@ -339,6 +342,56 @@ class HttpGameController {
     } catch (error) {
       console.error('Error fetching moves:', error);
       res.status(500).json({ error: 'Failed to fetch moves' });
+    }
+  }
+
+  /**
+   * Force start a game (admin feature)
+   */
+  async _forceStartGame(req, res) {
+    try {
+      const gameId = req.params.id;
+      const game = await this.gameService.getGameById(gameId);
+      
+      if (!game) {
+        return res.status(404).json({ error: 'Game not found' });
+      }
+
+      const players = await this.gameService.getGamePlayers(gameId);
+      
+      if (players.length < 2) {
+        return res.status(400).json({ error: 'Game needs at least 2 players to start' });
+      }
+
+      if (game.status === 'active') {
+        return res.status(400).json({ error: 'Game is already active' });
+      }
+
+      // Force start the game
+      const result = await this.gameService.forceStartGame(gameId);
+
+      // Send real-time notifications
+      await this.notificationService.broadcastToGame(gameId, 'game-started', {
+        gameId,
+        currentPlayerId: result.firstPlayerId
+      });
+
+      await this.notificationService.sendNotification(
+        result.firstPlayerId,
+        'turn',
+        'It\'s your turn!',
+        { gameId }
+      );
+
+      res.json({ 
+        message: 'Game started successfully',
+        gameId,
+        currentPlayerId: result.firstPlayerId,
+        playerCount: players.length
+      });
+    } catch (error) {
+      console.error('Error force starting game:', error);
+      res.status(500).json({ error: error.message || 'Failed to start game' });
     }
   }
 }

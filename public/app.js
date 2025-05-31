@@ -121,6 +121,12 @@ class AdminPanel {
                     this.renderGamesTable();
                 }
             }
+
+            // Handle force start button clicks
+            if (e.target.closest('.force-start-btn')) {
+                const gameId = e.target.closest('.force-start-btn').dataset.gameId;
+                this.forceStartGame(gameId);
+            }
         });
     }
 
@@ -224,6 +230,11 @@ class AdminPanel {
                         <button class="btn btn-sm btn-primary view-image-btn" data-game-id="${game.id}" title="View Board">
                             <i class="bi bi-image"></i>
                         </button>
+                        ${game.status === 'waiting' ? `
+                        <button class="btn btn-sm btn-success force-start-btn" data-game-id="${game.id}" title="Force Start Game">
+                            <i class="bi bi-play-fill"></i>
+                        </button>
+                        ` : ''}
                     </div>
                 </td>
             </tr>
@@ -540,31 +551,16 @@ class AdminPanel {
             
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             
-            // Show modal using Bootstrap's data attributes
-            const modal = document.getElementById('gameDetailModal');
-            modal.classList.add('show');
-            modal.style.display = 'block';
-            document.body.classList.add('modal-open');
+            // Use Bootstrap's Modal API
+            const modalElement = document.getElementById('gameDetailModal');
+            const modal = new bootstrap.Modal(modalElement);
             
-            // Add backdrop
-            const backdrop = document.createElement('div');
-            backdrop.className = 'modal-backdrop fade show';
-            backdrop.id = 'gameDetailBackdrop';
-            document.body.appendChild(backdrop);
+            // Clean up when modal is hidden
+            modalElement.addEventListener('hidden.bs.modal', () => {
+                modalElement.remove();
+            });
             
-            // Close modal when clicking close button or backdrop
-            const closeModal = () => {
-                modal.classList.remove('show');
-                modal.style.display = 'none';
-                document.body.classList.remove('modal-open');
-                const backdrop = document.getElementById('gameDetailBackdrop');
-                if (backdrop) backdrop.remove();
-                modal.remove();
-            };
-            
-            modal.querySelector('.btn-close').addEventListener('click', closeModal);
-            modal.querySelector('[data-bs-dismiss="modal"]').addEventListener('click', closeModal);
-            backdrop.addEventListener('click', closeModal);
+            modal.show();
             
         } catch (error) {
             alert('Error loading game details: ' + error.message);
@@ -595,6 +591,30 @@ class AdminPanel {
             alert('Game type validation successful!');
         } catch (error) {
             alert('Game type validation failed: ' + error.message);
+        }
+    }
+
+    async forceStartGame(gameId) {
+        const confirmation = confirm('Force start this game?\n\nThis will make the game active and set the first player\'s turn.');
+        
+        if (!confirmation) {
+            return;
+        }
+
+        try {
+            const response = await this.fetchAPI(`/api/games/${gameId}/force-start`, {
+                method: 'POST'
+            });
+            
+            console.log('Game force started:', response);
+            alert(`Game started successfully!\nCurrent player: ${response.currentPlayerId}\nPlayers: ${response.playerCount}`);
+            
+            // Refresh the games list
+            await this.loadGames();
+            
+        } catch (error) {
+            console.error('Error force starting game:', error);
+            alert('Error starting game: ' + error.message);
         }
     }
 

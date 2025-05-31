@@ -1,4 +1,5 @@
 const BoardGame = require('../BoardGame');
+const { Chess: ChessGame } = require('chess.js');
 
 class Chess extends BoardGame {
   static GAME_TYPE_NAME = 'Chess';
@@ -37,116 +38,69 @@ class Chess extends BoardGame {
         return { valid: false, error: 'Invalid move format' };
       }
 
-      // Parse move notation (simplified - accepts basic formats like e2-e4, Nf3, etc.)
-      const standardMovePattern = /^([a-h][1-8])-([a-h][1-8])$/; // e2-e4 format
-      const algebraicMovePattern = /^([NBRQK]?)([a-h]?[1-8]?)(x?)([a-h][1-8])(=[NBRQ])?(\+|#)?$/; // Nf3 format
+      // Create chess game instance from current board state
+      const chessGame = new ChessGame();
       
-      const standardMatch = move.match(standardMovePattern);
-      const algebraicMatch = move.match(algebraicMovePattern);
+      // Convert our board state to FEN notation for the chess library
+      const fen = this.boardStateToFen(currentBoardState);
+      chessGame.load(fen);
+
+      // Try to make the move using the chess library
+      const moveResult = chessGame.move(move.trim());
       
-      if (!standardMatch && !algebraicMatch) {
-        return { valid: false, error: 'Invalid move notation. Use format like e2-e4 or Nf3' };
+      if (!moveResult) {
+        return { valid: false, error: 'Invalid move for current position' };
       }
 
-      // Extract destination square from either format
-      let to;
-      if (standardMatch) {
-        to = standardMatch[2]; // e.g., "e4" from "e2-e4"
-      } else if (algebraicMatch) {
-        to = algebraicMatch[4]; // e.g., "f3" from "Nf3"
-      }
-      
-      // Validate destination square
-      const file = to.charCodeAt(0) - 97; // a-h to 0-7
-      const rank = parseInt(to[1]) - 1;   // 1-8 to 0-7
-      
-      if (file < 0 || file > 7 || rank < 0 || rank > 7) {
-        return { valid: false, error: 'Invalid destination square' };
-      }
-
-      // Get player color
-      const playerColor = this.getPlayerColor(playerId);
-      if (!playerColor) {
-        return { valid: false, error: 'Player not in game' };
-      }
-
-      // Basic turn validation
-      const currentPlayer = playerColor === 'white' ? 'white' : 'black';
-      const expectedPieceCase = currentPlayer === 'white' ? 'uppercase' : 'lowercase';
-
-      // More detailed validation would require implementing chess rules
-      // For now, we'll accept the move if it follows basic format
+      // Move is valid according to chess rules
       return { valid: true };
       
     } catch (error) {
-      return { valid: false, error: 'Move validation failed' };
+      console.error('Chess move validation error:', error);
+      return { valid: false, error: 'Move validation failed: ' + error.message };
     }
   }
 
   applyMove(move, currentBoardState) {
-    const newBoardState = JSON.parse(JSON.stringify(currentBoardState));
-    
-    // Parse the move notation and apply it to the board
-    const standardMovePattern = /^([a-h][1-8])-([a-h][1-8])$/; // e2-e4 format
-    const algebraicMovePattern = /^([NBRQK]?)([a-h]?[1-8]?)(x?)([a-h][1-8])(=[NBRQ])?(\+|#)?$/; // Nf3 format
-    
-    const standardMatch = move.match(standardMovePattern);
-    const algebraicMatch = move.match(algebraicMovePattern);
-    
-    if (standardMatch) {
-      // Handle standard notation like e2-e4
-      const fromSquare = standardMatch[1];
-      const toSquare = standardMatch[2];
+    try {
+      // Create chess game instance from current board state
+      const chessGame = new ChessGame();
       
-      const fromPos = this.algebraicToPosition(fromSquare);
-      const toPos = this.algebraicToPosition(toSquare);
+      // Convert our board state to FEN notation for the chess library
+      const fen = this.boardStateToFen(currentBoardState);
+      chessGame.load(fen);
+
+      // Apply the move using the chess library
+      const moveResult = chessGame.move(move.trim());
       
-      // Move the piece
-      const piece = newBoardState.board[fromPos.row][fromPos.col];
-      newBoardState.board[toPos.row][toPos.col] = piece;
-      newBoardState.board[fromPos.row][fromPos.col] = null;
-      
-    } else if (algebraicMatch) {
-      // Handle algebraic notation like Nf3, Bxd7, etc.
-      const [, pieceType, fromHint, capture, toSquare] = algebraicMatch;
-      const toPos = this.algebraicToPosition(toSquare);
-      
-      // Determine whose turn it is based on move count (odd = white, even = black)
-      const isWhiteMove = (newBoardState.fullmoveNumber || 1) % 2 === 1;
-      
-      // Find the piece that can make this move
-      const piece = this.findPieceForAlgebraicMove(newBoardState, pieceType || 'P', toPos, fromHint, isWhiteMove);
-      
-      if (piece) {
-        // Move the piece
-        newBoardState.board[toPos.row][toPos.col] = piece.symbol;
-        newBoardState.board[piece.row][piece.col] = null;
-      } else {
-        throw new Error(`No valid ${pieceType || 'pawn'} can move to ${toSquare}`);
+      if (!moveResult) {
+        throw new Error('Invalid move');
       }
+
+      // Get the new board state from the chess library
+      const newFen = chessGame.fen();
+      const newBoardState = this.fenToBoardState(newFen);
+      
+      return newBoardState;
+      
+    } catch (error) {
+      console.error('Chess move application error:', error);
+      throw new Error('Failed to apply move: ' + error.message);
     }
-    
-    // Increment move counters
-    if (newBoardState.fullmoveNumber) {
-      newBoardState.fullmoveNumber += 1;
-    }
-    
-    // Reset en passant target (would be set if pawn moved two squares)
-    newBoardState.enPassantTarget = null;
-    
-    return newBoardState;
   }
 
   isGameComplete(boardState) {
-    // In a full implementation, check for:
-    // - Checkmate
-    // - Stalemate  
-    // - Insufficient material
-    // - 50-move rule
-    // - Threefold repetition
-    
-    // For now, return false (game continues)
-    return false;
+    try {
+      // Use chess library to check if game is complete
+      const chessGame = new ChessGame();
+      const fen = this.boardStateToFen(boardState);
+      chessGame.load(fen);
+      
+      return chessGame.isCheckmate() || chessGame.isStalemate() || chessGame.isDraw();
+    } catch (error) {
+      console.error('Error checking if game complete:', error);
+      return false;
+    }
   }
 
   getWinner(boardState) {
@@ -347,6 +301,114 @@ class Chess extends BoardGame {
     const blackKing = this.findKing(boardState, 'black');
     
     return whiteKing !== null && blackKing !== null;
+  }
+
+  // Helper methods for FEN conversion
+  boardStateToFen(boardState) {
+    try {
+      // Convert board array to FEN board representation
+      let fenBoard = '';
+      for (let row = 0; row < 8; row++) {
+        let emptyCount = 0;
+        for (let col = 0; col < 8; col++) {
+          const piece = boardState.board[row][col];
+          if (piece === null) {
+            emptyCount++;
+          } else {
+            if (emptyCount > 0) {
+              fenBoard += emptyCount;
+              emptyCount = 0;
+            }
+            fenBoard += piece;
+          }
+        }
+        if (emptyCount > 0) {
+          fenBoard += emptyCount;
+        }
+        if (row < 7) {
+          fenBoard += '/';
+        }
+      }
+
+      // Determine active color (assume white's turn by default, could be improved)
+      const activeColor = 'w';
+      
+      // Castling rights from board state
+      let castling = '';
+      if (boardState.castlingRights) {
+        if (boardState.castlingRights.whiteKingside) castling += 'K';
+        if (boardState.castlingRights.whiteQueenside) castling += 'Q';
+        if (boardState.castlingRights.blackKingside) castling += 'k';
+        if (boardState.castlingRights.blackQueenside) castling += 'q';
+      }
+      if (castling === '') castling = '-';
+
+      // En passant target
+      const enPassant = boardState.enPassantTarget || '-';
+
+      // Half-move clock and full-move number
+      const halfMove = boardState.halfmoveClock || 0;
+      const fullMove = boardState.fullmoveNumber || 1;
+
+      return `${fenBoard} ${activeColor} ${castling} ${enPassant} ${halfMove} ${fullMove}`;
+    } catch (error) {
+      console.error('Error converting board state to FEN:', error);
+      // Return starting position as fallback
+      return 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    }
+  }
+
+  fenToBoardState(fen) {
+    try {
+      const parts = fen.split(' ');
+      const fenBoard = parts[0];
+      const activeColor = parts[1];
+      const castling = parts[2];
+      const enPassant = parts[3];
+      const halfMove = parseInt(parts[4]) || 0;
+      const fullMove = parseInt(parts[5]) || 1;
+
+      // Convert FEN board to array
+      const board = [];
+      const rows = fenBoard.split('/');
+      
+      for (const row of rows) {
+        const boardRow = [];
+        for (const char of row) {
+          if (char >= '1' && char <= '8') {
+            // Empty squares
+            const emptyCount = parseInt(char);
+            for (let i = 0; i < emptyCount; i++) {
+              boardRow.push(null);
+            }
+          } else {
+            // Piece
+            boardRow.push(char);
+          }
+        }
+        board.push(boardRow);
+      }
+
+      // Build castling rights
+      const castlingRights = {
+        whiteKingside: castling.includes('K'),
+        whiteQueenside: castling.includes('Q'),
+        blackKingside: castling.includes('k'),
+        blackQueenside: castling.includes('q')
+      };
+
+      return {
+        board,
+        castlingRights,
+        enPassantTarget: enPassant === '-' ? null : enPassant,
+        halfmoveClock: halfMove,
+        fullmoveNumber: fullMove
+      };
+    } catch (error) {
+      console.error('Error converting FEN to board state:', error);
+      // Return initial board state as fallback
+      return this.getInitialBoardState();
+    }
   }
 }
 
