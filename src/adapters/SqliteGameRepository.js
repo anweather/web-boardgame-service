@@ -320,7 +320,9 @@ class SqliteGameRepository extends GameRepository {
             gameId: row.game_id,
             playerId: row.user_id,
             username: row.username,
-            move: JSON.parse(row.move_notation),
+            move: typeof row.move_notation === 'string' && (row.move_notation.startsWith('{') || row.move_notation.startsWith('"'))
+              ? JSON.parse(row.move_notation) 
+              : row.move_notation,
             boardStateAfter: row.board_state_after,
             moveNumber: row.move_number,
             timestamp: row.timestamp

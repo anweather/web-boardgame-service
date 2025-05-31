@@ -456,7 +456,18 @@ class BoardGamePlayer {
         }
 
         const movesHtml = moves.map(move => {
-            const moveData = JSON.parse(move.move);
+            // Handle move.move which can be either a string or JSON
+            let moveData;
+            try {
+                // Try to parse as JSON first (in case it's stored as JSON)
+                moveData = typeof move.move === 'string' && (move.move.startsWith('{') || move.move.startsWith('"')) 
+                    ? JSON.parse(move.move) 
+                    : move.move;
+            } catch (error) {
+                // If JSON parsing fails, use the raw string
+                moveData = move.move;
+            }
+            
             const moveText = this.formatMove(moveData);
             
             return `

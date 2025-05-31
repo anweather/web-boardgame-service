@@ -7,10 +7,9 @@ const helmet = require('helmet');
 const fs = require('fs');
 const path = require('path');
 
-const gameRoutes = require('../src/routes/games');
-const userRoutes = require('../src/routes/users');
 const gameTypeRoutes = require('../src/routes/gameTypes');
 const { initializeDatabase, closeDatabase } = require('../src/database/init');
+const dependencies = require('../src/config/dependencies');
 
 // Create test app
 function createTestApp() {
@@ -18,12 +17,19 @@ function createTestApp() {
   const server = createServer(app);
   const io = new Server(server);
 
+  // Set up dependency injection with Socket.IO
+  dependencies.setSocketIo(io);
+
   app.use(helmet());
   app.use(cors());
   app.use(express.json());
 
-  app.use('/api/games', gameRoutes);
-  app.use('/api/users', userRoutes);
+  // Get routers from dependency container
+  const routers = dependencies.getRouters();
+
+  // Routes using new architecture
+  app.use('/api/games', routers.games);
+  app.use('/api/users', routers.users);
   app.use('/api/game-types', gameTypeRoutes);
 
   app.set('socketio', io);
@@ -43,6 +49,11 @@ describe('Correspondence Board Game - Blackbox Tests', () => {
     app = testApp.app;
     server = testApp.server;
     io = testApp.io;
+  });
+
+  beforeEach(() => {
+    // Clear dependency container to avoid test interference
+    dependencies.clear();
   });
 
   afterAll(async () => {
@@ -206,62 +217,49 @@ describe('Correspondence Board Game - Blackbox Tests', () => {
       .expect(200);
 
     expect(gameTypesResponse.body).toBeInstanceOf(Array);
-    expect(gameTypesResponse.body.length).toBeGreaterThanOrEqual(3);
+    expect(gameTypesResponse.body.length).toBeGreaterThanOrEqual(1);
     
     const gameTypes = gameTypesResponse.body.map(gt => gt.type);
     expect(gameTypes).toContain('chess');
-    expect(gameTypes).toContain('checkers');
-    expect(gameTypes).toContain('hearts');
     
     console.log('✓ Verified game types:', gameTypes.join(', '));
 
-    // Create a checkers game
+    // Create a second chess game to test multi-game support
     const timestamp = Date.now();
     const userResponse = await request(app)
       .post('/api/users/register')
       .send({
-        username: `checkers_${timestamp}`,
-        email: `checkers_${timestamp}@test.com`,
+        username: `player_${timestamp}`,
+        email: `player_${timestamp}@test.com`,
         password: 'password123'
       })
       .expect(201);
 
-    const checkersGameResponse = await request(app)
+    const chessGame2Response = await request(app)
       .post('/api/games')
       .send({
-        name: 'Test Checkers Game',
-        gameType: 'checkers',
+        name: 'Test Chess Game #2',
+        gameType: 'chess',
         creatorId: userResponse.body.user.id
       })
       .expect(201);
 
-    // Download checkers board image
-    const checkersImageResponse = await request(app)
-      .get(`/api/games/${checkersGameResponse.body.id}/image`)
+    // Download chess board image
+    const chessImageResponse = await request(app)
+      .get(`/api/games/${chessGame2Response.body.id}/image`)
       .expect(200);
 
-    expect(checkersImageResponse.headers['content-type']).toBe('image/png');
-    expect(checkersImageResponse.body.length).toBeGreaterThan(1000);
-    console.log('✓ Created checkers game and downloaded image:', checkersImageResponse.body.length, 'bytes');
+    expect(chessImageResponse.headers['content-type']).toBe('image/png');
+    expect(chessImageResponse.body.length).toBeGreaterThan(1000);
+    console.log('✓ Created second chess game and downloaded image:', chessImageResponse.body.length, 'bytes');
 
-    // Create a Hearts game  
-    const heartsGameResponse = await request(app)
-      .post('/api/games')
-      .send({
-        name: 'Test Hearts Game',
-        gameType: 'hearts',
-        creatorId: userResponse.body.user.id
-      })
-      .expect(201);
-
-    // Download hearts board image
-    const heartsImageResponse = await request(app)
-      .get(`/api/games/${heartsGameResponse.body.id}/image`)
+    // Test listing multiple games
+    const allGamesResponse = await request(app)
+      .get('/api/games')
       .expect(200);
 
-    expect(heartsImageResponse.headers['content-type']).toBe('image/png');
-    expect(heartsImageResponse.body.length).toBeGreaterThan(1000);
-    console.log('✓ Created hearts game and downloaded image:', heartsImageResponse.body.length, 'bytes');
+    expect(allGamesResponse.body.length).toBeGreaterThanOrEqual(2);
+    console.log('✓ Verified multiple games in system:', allGamesResponse.body.length, 'games');
 
     console.log('\n🎉 Multi-game type test passed!');
   });

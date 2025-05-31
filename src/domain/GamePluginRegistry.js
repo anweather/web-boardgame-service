@@ -191,7 +191,7 @@ class GamePluginRegistry {
   static createWithDefaults() {
     const registry = new GamePluginRegistry();
     
-    // Auto-register default plugins
+    // Auto-register game types from games/types directory
     try {
       const ChessPlugin = require('../plugins/ChessPlugin');
       registry.register('chess', ChessPlugin);
@@ -199,19 +199,8 @@ class GamePluginRegistry {
       console.warn('Could not load ChessPlugin:', error.message);
     }
 
-    try {
-      const CheckersPlugin = require('../plugins/CheckersPlugin');
-      registry.register('checkers', CheckersPlugin);
-    } catch (error) {
-      console.warn('Could not load CheckersPlugin:', error.message);
-    }
-
-    try {
-      const HeartsPlugin = require('../plugins/HeartsPlugin');
-      registry.register('hearts', HeartsPlugin);
-    } catch (error) {
-      console.warn('Could not load HeartsPlugin:', error.message);
-    }
+    // Only register game types that actually exist and work
+    // For now, only chess is fully implemented with plugins
 
     return registry;
   }

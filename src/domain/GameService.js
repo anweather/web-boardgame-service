@@ -278,7 +278,7 @@ class GameService {
    * @returns {Promise<Array>} Array of moves
    */
   async getMoveHistory(gameId) {
-    return await this.gameRepository.getMoves(gameId);
+    return await this.gameRepository.getMoveHistory(gameId);
   }
 
   /**
