@@ -8,11 +8,23 @@ A Node.js/Express webserver for asynchronous correspondence board games. Support
 
 ## Development Setup
 
+### Local Development
 1. Install dependencies: `npm install`
 2. Copy environment file: `cp .env.example .env`
 3. Update JWT_SECRET in .env for production
 4. Start development server: `npm run dev`
 5. For production: `npm start`
+
+### Docker Development
+1. Build and run with Docker Compose: `docker-compose up --build`
+2. Access application at `http://localhost:3000`
+3. Database persists in `./data` directory
+4. Stop with: `docker-compose down`
+
+### Docker Production
+1. Build image: `docker build -t correspondence-board-game .`
+2. Run container: `docker run -p 3000:3000 -v $(pwd)/data:/app/data correspondence-board-game`
+3. Or use docker-compose for production: `docker-compose -f docker-compose.yml up -d`
 
 ## Commands
 
