@@ -2,12 +2,19 @@ class AdminPanel {
     constructor() {
         this.baseURL = window.location.origin;
         this.socket = null;
+        this.adminUserId = null;
+        this.gamesCurrentPage = 1;
+        this.gamesPerPage = 25;
+        this.gamesTotal = 0;
+        this.allGames = [];
         this.init();
     }
 
     async init() {
         this.initializeSocket();
         this.bindEventListeners();
+        await this.getOrCreateAdminUser();
+        await this.loadGameTypesForModal(); // Load game types for the modal dropdown
         await this.loadDashboard();
     }
 
@@ -69,6 +76,18 @@ class AdminPanel {
             this.createGame();
         });
 
+        // Games per page selector
+        document.getElementById('gamesPerPage').addEventListener('change', (e) => {
+            this.gamesPerPage = parseInt(e.target.value);
+            this.gamesCurrentPage = 1; // Reset to first page
+            this.renderGamesTable();
+        });
+
+        // Purge database button
+        document.getElementById('purgeDataBtn').addEventListener('click', () => {
+            this.purgeDatabase();
+        });
+
         // Event delegation for dynamically created buttons
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('refresh-btn')) {
@@ -92,6 +111,15 @@ class AdminPanel {
             if (e.target.closest('.test-game-type-btn')) {
                 const gameType = e.target.closest('.test-game-type-btn').dataset.gameType;
                 this.testGameType(gameType);
+            }
+
+            // Handle pagination button clicks
+            if (e.target.closest('.pagination-btn')) {
+                const page = parseInt(e.target.closest('.pagination-btn').dataset.page);
+                if (page && page !== this.gamesCurrentPage) {
+                    this.gamesCurrentPage = page;
+                    this.renderGamesTable();
+                }
             }
         });
     }
@@ -139,41 +167,241 @@ class AdminPanel {
     async loadGames() {
         try {
             const games = await this.fetchAPI('/api/games');
-            const tbody = document.getElementById('games-table');
+            // Sort games by creation date, newest first
+            this.allGames = games.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            this.gamesTotal = games.length;
+            this.gamesCurrentPage = 1; // Reset to first page
+            this.renderGamesTable();
+        } catch (error) {
+            console.error('Error loading games:', error);
+            document.getElementById('games-table').innerHTML = 
+                '<tr><td colspan="6" class="text-center text-danger">Error loading games</td></tr>';
+            document.getElementById('games-info').textContent = '';
+            document.getElementById('games-pagination').innerHTML = '';
+        }
+    }
+
+    renderGamesTable() {
+        const tbody = document.getElementById('games-table');
+        const infoDiv = document.getElementById('games-info');
+        const paginationDiv = document.getElementById('games-pagination');
+        
+        if (this.allGames.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No games found</td></tr>';
+            infoDiv.textContent = '';
+            paginationDiv.innerHTML = '';
+            return;
+        }
+
+        // Calculate pagination
+        const totalPages = Math.ceil(this.gamesTotal / this.gamesPerPage);
+        const startIndex = (this.gamesCurrentPage - 1) * this.gamesPerPage;
+        const endIndex = Math.min(startIndex + this.gamesPerPage, this.gamesTotal);
+        const currentGames = this.allGames.slice(startIndex, endIndex);
+
+        // Update info
+        infoDiv.textContent = `Showing ${startIndex + 1} to ${endIndex} of ${this.gamesTotal} entries`;
+
+        // Render table rows
+        tbody.innerHTML = currentGames.map(game => `
+            <tr>
+                <td>
+                    <div class="fw-bold">${game.name || 'Unnamed Game'}</div>
+                    <small class="text-muted">${game.id.substring(0, 8)}...</small>
+                </td>
+                <td><span class="badge bg-secondary">${this.formatGameType(game.gameType)}</span></td>
+                <td><span class="badge bg-${this.getStatusColor(game.status)}">${game.status}</span></td>
+                <td>${game.players?.length || 0}/${game.maxPlayers || 'N/A'}</td>
+                <td>
+                    <div>${new Date(game.createdAt).toLocaleDateString()}</div>
+                    <small class="text-muted">${new Date(game.createdAt).toLocaleTimeString()}</small>
+                </td>
+                <td>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-info view-game-btn" data-game-id="${game.id}" title="View Details">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-primary view-image-btn" data-game-id="${game.id}" title="View Board">
+                            <i class="bi bi-image"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+
+        // Render pagination
+        this.renderPagination(totalPages);
+    }
+
+    renderPagination(totalPages) {
+        const paginationDiv = document.getElementById('games-pagination');
+        
+        if (totalPages <= 1) {
+            paginationDiv.innerHTML = '';
+            return;
+        }
+
+        let paginationHTML = '';
+        
+        // Previous button
+        paginationHTML += `
+            <li class="page-item ${this.gamesCurrentPage === 1 ? 'disabled' : ''}">
+                <button class="page-link pagination-btn" data-page="${this.gamesCurrentPage - 1}" ${this.gamesCurrentPage === 1 ? 'disabled' : ''}>
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+            </li>
+        `;
+
+        // Page numbers
+        const startPage = Math.max(1, this.gamesCurrentPage - 2);
+        const endPage = Math.min(totalPages, this.gamesCurrentPage + 2);
+
+        if (startPage > 1) {
+            paginationHTML += `
+                <li class="page-item">
+                    <button class="page-link pagination-btn" data-page="1">1</button>
+                </li>
+            `;
+            if (startPage > 2) {
+                paginationHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            paginationHTML += `
+                <li class="page-item ${i === this.gamesCurrentPage ? 'active' : ''}">
+                    <button class="page-link pagination-btn" data-page="${i}">${i}</button>
+                </li>
+            `;
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                paginationHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+            paginationHTML += `
+                <li class="page-item">
+                    <button class="page-link pagination-btn" data-page="${totalPages}">${totalPages}</button>
+                </li>
+            `;
+        }
+
+        // Next button
+        paginationHTML += `
+            <li class="page-item ${this.gamesCurrentPage === totalPages ? 'disabled' : ''}">
+                <button class="page-link pagination-btn" data-page="${this.gamesCurrentPage + 1}" ${this.gamesCurrentPage === totalPages ? 'disabled' : ''}>
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </li>
+        `;
+
+        paginationDiv.innerHTML = paginationHTML;
+    }
+
+    formatGameType(gameType) {
+        const types = {
+            'chess': 'Chess',
+            'checkers': 'Checkers', 
+            'hearts': 'Hearts'
+        };
+        return types[gameType] || gameType.charAt(0).toUpperCase() + gameType.slice(1);
+    }
+
+    async purgeDatabase() {
+        const confirmation = confirm(
+            'Are you sure you want to purge the database?\n\n' +
+            'This will permanently delete:\n' +
+            '• All games and game history\n' +
+            '• All users (except admin)\n' +
+            '• All notifications\n\n' +
+            'This action cannot be undone!'
+        );
+
+        if (!confirmation) {
+            return;
+        }
+
+        try {
+            // Show loading state
+            const purgeBtn = document.getElementById('purgeDataBtn');
+            const originalText = purgeBtn.innerHTML;
+            purgeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Purging...';
+            purgeBtn.disabled = true;
+
+            const response = await this.fetchAPI('/api/admin/purge', {
+                method: 'POST'
+            });
+
+            console.log('Database purged:', response);
             
-            if (games.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-center">No games found</td></tr>';
+            // Refresh all data
+            await Promise.all([
+                this.loadDashboard(),
+                this.loadGames(),
+                this.loadUsers()
+            ]);
+
+            alert('Database purged successfully! All test data has been removed.');
+        } catch (error) {
+            console.error('Error purging database:', error);
+            alert('Error purging database: ' + error.message);
+        } finally {
+            // Restore button state
+            const purgeBtn = document.getElementById('purgeDataBtn');
+            purgeBtn.innerHTML = '<i class="bi bi-trash"></i> Purge Database';
+            purgeBtn.disabled = false;
+        }
+    }
+
+    async loadUsers() {
+        try {
+            const users = await this.fetchAPI('/api/users');
+            const tbody = document.getElementById('users-table');
+            
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center">No users found</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = games.map(game => `
+            tbody.innerHTML = users.map(user => `
                 <tr>
-                    <td>${game.id}</td>
-                    <td><span class="badge bg-secondary">${game.gameType}</span></td>
-                    <td><span class="badge bg-${this.getStatusColor(game.status)}">${game.status}</span></td>
-                    <td>${game.players?.length || 0}/${game.maxPlayers || 'N/A'}</td>
-                    <td>${new Date(game.createdAt).toLocaleDateString()}</td>
+                    <td>${user.id}</td>
+                    <td>${user.username}</td>
+                    <td>${new Date(user.createdAt).toLocaleDateString()}</td>
+                    <td>${user.gamesPlayed || 0}</td>
                     <td>
-                        <button class="btn btn-sm btn-info view-game-btn" data-game-id="${game.id}">
+                        <button class="btn btn-sm btn-info view-user-btn" data-user-id="${user.id}">
                             <i class="bi bi-eye"></i>
-                        </button>
-                        <button class="btn btn-sm btn-primary view-image-btn" data-game-id="${game.id}">
-                            <i class="bi bi-image"></i>
                         </button>
                     </td>
                 </tr>
             `).join('');
         } catch (error) {
-            console.error('Error loading games:', error);
-            document.getElementById('games-table').innerHTML = 
-                '<tr><td colspan="6" class="text-center text-danger">Error loading games</td></tr>';
+            console.error('Error loading users:', error);
+            document.getElementById('users-table').innerHTML = 
+                '<tr><td colspan="5" class="text-center text-danger">Error loading users</td></tr>';
         }
     }
 
-    async loadUsers() {
-        // For now, show placeholder since we need to implement the users list endpoint
-        const tbody = document.getElementById('users-table');
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Users endpoint not yet implemented</td></tr>';
+    async loadGameTypesForModal() {
+        try {
+            const gameTypes = await this.fetchAPI('/api/game-types');
+            const select = document.getElementById('gameType');
+            
+            if (!gameTypes || gameTypes.length === 0) {
+                select.innerHTML = '<option value="">No game types available</option>';
+                return;
+            }
+
+            select.innerHTML = '<option value="">Select a game type...</option>' +
+                gameTypes.map(gameType => 
+                    `<option value="${gameType.type}">${gameType.name || gameType.type}</option>`
+                ).join('');
+        } catch (error) {
+            console.error('Error loading game types for modal:', error);
+            const select = document.getElementById('gameType');
+            select.innerHTML = '<option value="">Error loading game types</option>';
+        }
     }
 
     async loadGameTypes() {
@@ -181,21 +409,21 @@ class AdminPanel {
             const gameTypes = await this.fetchAPI('/api/game-types');
             const grid = document.getElementById('game-types-grid');
             
-            if (!gameTypes || Object.keys(gameTypes).length === 0) {
+            if (!gameTypes || gameTypes.length === 0) {
                 grid.innerHTML = '<div class="col-12 text-center">No game types found</div>';
                 return;
             }
 
-            grid.innerHTML = Object.entries(gameTypes).map(([type, info]) => `
+            grid.innerHTML = gameTypes.map(gameType => `
                 <div class="col-md-4 mb-3">
                     <div class="card">
                         <div class="card-body">
-                            <h5 class="card-title">${type}</h5>
+                            <h5 class="card-title">${gameType.name || gameType.type}</h5>
                             <p class="card-text">
-                                <strong>Players:</strong> ${info.minPlayers}-${info.maxPlayers}<br>
-                                <strong>Description:</strong> ${info.description || 'No description available'}
+                                <strong>Players:</strong> ${gameType.minPlayers}-${gameType.maxPlayers}<br>
+                                <strong>Description:</strong> ${gameType.description || 'No description available'}
                             </p>
-                            <button class="btn btn-primary btn-sm test-game-type-btn" data-game-type="${type}">
+                            <button class="btn btn-primary btn-sm test-game-type-btn" data-game-type="${gameType.type}">
                                 Test Validation
                             </button>
                         </div>
@@ -206,8 +434,8 @@ class AdminPanel {
             // Also populate the create game dropdown
             const select = document.getElementById('gameType');
             select.innerHTML = '<option value="">Select a game type...</option>' +
-                Object.keys(gameTypes).map(type => 
-                    `<option value="${type}">${type}</option>`
+                gameTypes.map(gameType => 
+                    `<option value="${gameType.type}">${gameType.name || gameType.type}</option>`
                 ).join('');
         } catch (error) {
             console.error('Error loading game types:', error);
@@ -232,7 +460,7 @@ class AdminPanel {
             const gameData = { 
                 gameType,
                 name: gameName || `${gameType} Game ${Date.now()}`,
-                creatorId: 'admin' // Use admin as default creator for admin panel
+                creatorId: this.adminUserId // Use dynamic admin user ID
             };
 
             console.log('Sending game data:', gameData);
@@ -253,10 +481,11 @@ class AdminPanel {
             if (backdrop) backdrop.remove();
             document.getElementById('createGameForm').reset();
             
-            // Switch to games tab and refresh
+            // Switch to games tab and refresh games list
             document.querySelector('[href="#games"]').click();
+            await this.loadGames(); // Refresh the games list
             
-            alert(`Game created successfully! ID: ${response.id}`);
+            alert(`Game "${response.name}" created successfully!`);
         } catch (error) {
             console.error('Error creating game:', error);
             alert('Error creating game: ' + error.message);
@@ -388,6 +617,38 @@ class AdminPanel {
         
         // Update dashboard counters
         this.loadDashboard();
+    }
+
+    async getOrCreateAdminUser() {
+        try {
+            // First, try to find existing admin user
+            const users = await this.fetchAPI('/api/users');
+            const adminUser = users.find(user => user.username === 'admin');
+            
+            if (adminUser) {
+                this.adminUserId = adminUser.id;
+                console.log('Found existing admin user:', adminUser.id);
+                return;
+            }
+
+            // If no admin user exists, create one
+            console.log('Creating admin user...');
+            const newAdmin = await this.fetchAPI('/api/users/register', {
+                method: 'POST',
+                body: JSON.stringify({
+                    username: 'admin',
+                    email: 'admin@admin.com',
+                    password: 'admin123'
+                })
+            });
+            
+            this.adminUserId = newAdmin.user.id;
+            console.log('Created new admin user:', this.adminUserId);
+        } catch (error) {
+            console.error('Error getting/creating admin user:', error);
+            // Fallback to a default admin ID - this will fail gracefully if the user doesn't exist
+            this.adminUserId = 'admin';
+        }
     }
 
     async fetchAPI(endpoint, options = {}) {
