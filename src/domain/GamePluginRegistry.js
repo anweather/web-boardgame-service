@@ -185,24 +185,87 @@ class GamePluginRegistry {
   }
 
   /**
-   * Create a registry with default game plugins
-   * @returns {GamePluginRegistry} Registry with default plugins loaded
+   * Create a registry with dynamically loaded plugins
+   * @returns {GamePluginRegistry} Registry with auto-discovered plugins loaded
    */
   static createWithDefaults() {
     const registry = new GamePluginRegistry();
     
-    // Auto-register game types from games/types directory
-    try {
-      const ChessPlugin = require('../plugins/ChessPlugin');
-      registry.register('chess', ChessPlugin);
-    } catch (error) {
-      console.warn('Could not load ChessPlugin:', error.message);
-    }
-
-    // Only register game types that actually exist and work
-    // For now, only chess is fully implemented with plugins
-
+    // Dynamically discover and register plugins
+    registry.autoDiscoverPlugins();
+    
     return registry;
+  }
+
+  /**
+   * Automatically discover and register game plugins
+   */
+  autoDiscoverPlugins() {
+    const fs = require('fs');
+    const path = require('path');
+    
+    try {
+      const pluginsDir = path.join(__dirname, '../plugins');
+      
+      // Check if plugins directory exists
+      if (!fs.existsSync(pluginsDir)) {
+        console.warn('Plugins directory not found, no game plugins loaded');
+        return;
+      }
+      
+      // Scan for plugin directories
+      const entries = fs.readdirSync(pluginsDir, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const gameType = entry.name.toLowerCase();
+          const pluginClassName = entry.name.charAt(0).toUpperCase() + entry.name.slice(1) + 'Plugin';
+          const pluginPath = path.join(pluginsDir, entry.name, `${pluginClassName}.js`);
+          
+          // Try to load the plugin
+          try {
+            if (fs.existsSync(pluginPath)) {
+              const PluginClass = require(pluginPath);
+              this.register(gameType, PluginClass);
+              console.log(`✓ Loaded ${gameType} plugin`);
+            } else {
+              console.warn(`Plugin file not found: ${pluginPath}`);
+            }
+          } catch (error) {
+            console.warn(`Failed to load ${gameType} plugin:`, error.message);
+          }
+        }
+      }
+      
+      // Fallback: try to load known plugins directly if directory scan fails
+      if (this.getAvailableGameTypes().length === 0) {
+        console.log('Directory scan found no plugins, trying direct plugin loading...');
+        this.loadKnownPlugins();
+      }
+      
+    } catch (error) {
+      console.warn('Plugin auto-discovery failed, falling back to known plugins:', error.message);
+      this.loadKnownPlugins();
+    }
+  }
+
+  /**
+   * Load known plugins as fallback
+   */
+  loadKnownPlugins() {
+    const knownPlugins = [
+      { name: 'chess', path: '../plugins/ChessPlugin' }
+    ];
+    
+    for (const plugin of knownPlugins) {
+      try {
+        const PluginClass = require(plugin.path);
+        this.register(plugin.name, PluginClass);
+        console.log(`✓ Loaded ${plugin.name} plugin (fallback)`);
+      } catch (error) {
+        console.warn(`Failed to load ${plugin.name} plugin:`, error.message);
+      }
+    }
   }
 }
 

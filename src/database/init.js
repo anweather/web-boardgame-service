@@ -36,7 +36,7 @@ function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS games (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        game_type TEXT NOT NULL DEFAULT 'chess',
+        game_type TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'waiting',
         current_player_id TEXT,
         board_state TEXT NOT NULL,
