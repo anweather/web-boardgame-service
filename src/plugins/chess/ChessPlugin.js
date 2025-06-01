@@ -1,6 +1,6 @@
-const GamePlugin = require('../ports/GamePlugin');
-const ChessFrontend = require('./chess/ChessFrontend');
-const ChessRenderer = require('./chess/ChessRenderer');
+const GamePlugin = require('../../ports/GamePlugin');
+const ChessFrontend = require('./ChessFrontend');
+const ChessRenderer = require('./ChessRenderer');
 
 /**
  * Chess game plugin

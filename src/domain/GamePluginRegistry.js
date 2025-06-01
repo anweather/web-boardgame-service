@@ -222,10 +222,21 @@ class GamePluginRegistry {
           const pluginClassName = entry.name.charAt(0).toUpperCase() + entry.name.slice(1) + 'Plugin';
           const pluginPath = path.join(pluginsDir, entry.name, `${pluginClassName}.js`);
           
-          // Try to load the plugin
+          // Try to load and validate the plugin
           try {
             if (fs.existsSync(pluginPath)) {
+              // Validate plugin structure before loading
+              const PluginValidator = require('../framework/PluginValidator');
+              const pluginDir = path.join(pluginsDir, entry.name);
+              
+              // Validate plugin directory and file structure
+              PluginValidator.validatePluginDirectory(pluginDir, gameType);
+              PluginValidator.validatePluginFile(pluginPath, gameType);
+              
+              // Load and validate the plugin class
               const PluginClass = require(pluginPath);
+              PluginValidator.validatePlugin(PluginClass, gameType);
+              
               this.register(gameType, PluginClass);
               console.log(`✓ Loaded ${gameType} plugin`);
             } else {
