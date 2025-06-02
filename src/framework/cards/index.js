@@ -6,6 +6,7 @@
 const CardUtils = require('./CardUtils');
 const DeckManager = require('./DeckManager');
 const HandManager = require('./HandManager');
+const SinglePlayerGamePlugin = require('./SinglePlayerGamePlugin');
 
 // Re-export all functionality
 module.exports = {
@@ -13,6 +14,7 @@ module.exports = {
   CardUtils,
   DeckManager,
   HandManager,
+  SinglePlayerGamePlugin,
   
   // Convenience methods for quick access
   createCard: CardUtils.createCard,
