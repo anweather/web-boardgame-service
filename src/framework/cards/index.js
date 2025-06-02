@@ -7,6 +7,7 @@ const CardUtils = require('./CardUtils');
 const DeckManager = require('./DeckManager');
 const HandManager = require('./HandManager');
 const SinglePlayerGamePlugin = require('./SinglePlayerGamePlugin');
+const CardRenderer = require('./CardRenderer');
 
 // Re-export all functionality
 module.exports = {
@@ -15,12 +16,18 @@ module.exports = {
   DeckManager,
   HandManager,
   SinglePlayerGamePlugin,
+  CardRenderer,
   
   // Convenience methods for quick access
   createCard: CardUtils.createCard,
   createStandardDeck: DeckManager.createStandardDeck,
   createCustomDeck: DeckManager.createCustomDeck,
   createHand: HandManager.createHand,
+  
+  // Rendering methods
+  renderCard: CardRenderer.renderCard,
+  renderHand: CardRenderer.renderHand,
+  renderDeckPile: CardRenderer.renderDeckPile,
   
   // Common card operations
   shuffle: DeckManager.shuffle,
