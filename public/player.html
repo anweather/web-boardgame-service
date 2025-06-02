@@ -18,9 +18,12 @@
         }
         .board-image {
             max-width: 100%;
+            width: 100%;
+            min-width: 300px;
             height: auto;
             border: 2px solid #dee2e6;
             border-radius: 8px;
+            object-fit: contain;
         }
         .move-input {
             font-family: 'Courier New', monospace;
@@ -173,6 +176,9 @@
                                     <span class="text-muted">Waiting for other player...</span>
                                 </div>
                                 <div class="mt-2">
+                                    <button class="btn btn-outline-primary btn-sm me-2" id="copy-game-link-btn">
+                                        <i class="bi bi-link-45deg"></i> Copy Game Link
+                                    </button>
                                     <button class="btn btn-secondary btn-sm" id="leave-game-btn">
                                         <i class="bi bi-arrow-left"></i> Leave Game
                                     </button>
@@ -260,6 +266,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="js/GamePluginManager.js"></script>
     <script src="player.js"></script>
 </body>
 </html>

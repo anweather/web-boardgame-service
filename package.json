@@ -10,6 +10,8 @@
     "test:architecture": "jest tests/architecture.test.js",
     "test:all": "jest",
     "lint": "eslint src/",
+    "lint:plugins": "eslint src/plugins/",
+    "validate:plugins": "node scripts/validate-plugins.js",
     "format": "prettier --write src/"
   },
   "dependencies": {

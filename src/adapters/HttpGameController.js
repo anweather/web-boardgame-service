@@ -57,10 +57,10 @@ class HttpGameController {
    */
   async _createGame(req, res) {
     try {
-      const { name, gameType = 'chess', creatorId, settings = {} } = req.body;
+      const { name, gameType, creatorId, settings = {} } = req.body;
 
-      if (!name || !creatorId) {
-        return res.status(400).json({ error: 'Name and creatorId are required' });
+      if (!name || !creatorId || !gameType) {
+        return res.status(400).json({ error: 'Name, gameType, and creatorId are required' });
       }
 
       // Validate creator exists
@@ -301,12 +301,24 @@ class HttpGameController {
         return res.status(404).json({ error: 'Game not found' });
       }
 
+      // Parse image size parameters from query string
+      const width = parseInt(req.query.width) || 800;
+      const height = parseInt(req.query.height) || 800;
+      
+      // Validate and constrain image dimensions for security and performance
+      const constrainedWidth = Math.min(1600, Math.max(200, width));
+      const constrainedHeight = Math.min(1600, Math.max(200, height));
+
       const players = await this.gameService.getGamePlayers(game.id);
-      const imageBuffer = await this.imageService.generateGameImage(game, players);
+      const imageBuffer = await this.imageService.generateGameImage(game, players, {
+        width: constrainedWidth,
+        height: constrainedHeight
+      });
       
       res.set({
         'Content-Type': 'image/png',
-        'Content-Length': imageBuffer.length
+        'Content-Length': imageBuffer.length,
+        'Cache-Control': 'public, max-age=300' // Cache for 5 minutes
       });
       
       res.send(imageBuffer);

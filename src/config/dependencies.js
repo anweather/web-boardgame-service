@@ -107,30 +107,38 @@ class DependencyContainer {
   }
 
   /**
-   * Get image service (placeholder - would need implementation)
+   * Get image service using plugin system
    * @returns {Object}
    */
   getImageService() {
     if (!this._instances.has('imageService')) {
-      // For now, create a simple image service that delegates to existing renderer
-      const { generateBoardImage, generateCheckersBoard, generateCardsImage } = require('../services/svgBoardRenderer');
+      // Capture the dependency container context
+      const self = this;
       
       const imageService = {
-        async generateGameImage(game, players) {
+        async generateGameImage(game, players, options = {}) {
           const boardState = typeof game.boardState === 'string' 
             ? JSON.parse(game.boardState) 
             : game.boardState;
           
-          switch (game.gameType) {
-            case 'chess':
-              return generateBoardImage(boardState);
-            case 'checkers':
-              return generateCheckersBoard(boardState);
-            case 'hearts':
-              return generateCardsImage(boardState);
-            default:
-              return generateBoardImage(boardState);
+          // Get plugin for this game type using captured context
+          const plugin = self.getGamePluginRegistry().getPlugin(game.gameType);
+          
+          if (plugin && typeof plugin.constructor.generateBoardImage === 'function') {
+            // Use plugin's rendering method with passed options
+            try {
+              return await plugin.constructor.generateBoardImage(boardState, {
+                title: `${game.name || 'Game'} - ${plugin.getDisplayName()}`,
+                players: players,
+                ...options
+              });
+            } catch (error) {
+              console.error(`Error rendering ${game.gameType} board with plugin:`, error);
+            }
           }
+          
+          // No fallback - throw error for unsupported games
+          throw new Error(`No plugin renderer found for game type: ${game.gameType}. Please install the appropriate game plugin.`);
         }
       };
       

@@ -96,3 +96,18 @@ Currently supports:
 Each game type implements validation, move application, win conditions, and board rendering. Easy to add new game types by extending BoardGame class.
 
 Game state stored as JSON in database. Board rendering uses SVG converted to PNG via Sharp (no native dependencies). Supports Discord bot integration and web SPA frontends.
+
+## Development Guidelines
+
+### Commit Frequency
+- **Commit after completing each task** when tests pass
+- **Commit before major refactoring** to create safe restore points
+- **Use descriptive commit messages** that explain both what and why
+- **Include test status** in commit messages when relevant
+- **Reference issues/features** being implemented
+
+### Testing Before Commits
+- Verify server starts without errors: `npm start` 
+- Run test suite if available: `npm test`
+- Check basic functionality works
+- Ensure no import/syntax errors

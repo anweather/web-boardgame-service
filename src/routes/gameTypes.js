@@ -1,12 +1,22 @@
 const express = require('express');
-const GameFactory = require('../games/GameFactory');
+const dependencies = require('../config/dependencies');
 
 const router = express.Router();
 
 // Get all supported game types
 router.get('/', (req, res) => {
   try {
-    const gameTypes = GameFactory.getSupportedGameTypes();
+    const pluginRegistry = dependencies.getGamePluginRegistry();
+    const gameTypes = pluginRegistry.getAvailableGameTypes().map(gameType => {
+      const plugin = pluginRegistry.getPlugin(gameType);
+      return {
+        type: gameType,
+        name: plugin.getDisplayName(),
+        description: plugin.getDescription(),
+        minPlayers: plugin.getMinPlayers(),
+        maxPlayers: plugin.getMaxPlayers()
+      };
+    });
     res.json(gameTypes);
   } catch (error) {
     console.error('Error fetching game types:', error);
@@ -17,11 +27,20 @@ router.get('/', (req, res) => {
 // Get specific game type info
 router.get('/:gameType', (req, res) => {
   try {
-    const gameTypeInfo = GameFactory.getGameTypeInfo(req.params.gameType);
+    const pluginRegistry = dependencies.getGamePluginRegistry();
+    const plugin = pluginRegistry.getPlugin(req.params.gameType);
     
-    if (!gameTypeInfo) {
+    if (!plugin) {
       return res.status(404).json({ error: 'Game type not found' });
     }
+
+    const gameTypeInfo = {
+      type: req.params.gameType,
+      name: plugin.getDisplayName(),
+      description: plugin.getDescription(),
+      minPlayers: plugin.getMinPlayers(),
+      maxPlayers: plugin.getMaxPlayers()
+    };
 
     res.json(gameTypeInfo);
   } catch (error) {

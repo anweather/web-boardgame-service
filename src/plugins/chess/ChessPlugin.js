@@ -1,4 +1,6 @@
-const GamePlugin = require('../ports/GamePlugin');
+const GamePlugin = require('../../ports/GamePlugin');
+const ChessFrontend = require('./ChessFrontend');
+const ChessRenderer = require('./ChessRenderer');
 
 /**
  * Chess game plugin
@@ -359,6 +361,92 @@ class ChessPlugin extends GamePlugin {
     }
     
     return { white: whitePieces, black: blackPieces, total: whitePieces + blackPieces };
+  }
+
+  // ============================================================================
+  // FRONTEND INTERFACE IMPLEMENTATION
+  // ============================================================================
+
+  /**
+   * Parse move from user input (delegated to frontend module)
+   */
+  static parseMove(moveText) {
+    return ChessFrontend.parseMove(moveText);
+  }
+
+  /**
+   * Format move data for display (delegated to frontend module)
+   */
+  static formatMove(moveData) {
+    return ChessFrontend.formatMove(moveData);
+  }
+
+  /**
+   * Get placeholder text for move input field
+   */
+  static getMoveInputPlaceholder() {
+    return ChessFrontend.getMoveInputPlaceholder();
+  }
+
+  /**
+   * Get help text for move input
+   */
+  static getMoveInputHelp() {
+    return ChessFrontend.getMoveInputHelp();
+  }
+
+  /**
+   * Validate move format before sending to backend
+   */
+  static validateMoveFormat(moveText) {
+    return ChessFrontend.validateMoveFormat(moveText);
+  }
+
+  // ============================================================================
+  // RENDERING INTERFACE IMPLEMENTATION
+  // ============================================================================
+
+  /**
+   * Generate board image as PNG buffer (delegated to renderer)
+   */
+  static async generateBoardImage(boardState, options = {}) {
+    return await ChessRenderer.generateBoardImage(boardState, options);
+  }
+
+  /**
+   * Create board SVG content (delegated to renderer)
+   */
+  static createBoardSVG(boardState, options = {}) {
+    return ChessRenderer.createChessBoardSVG(boardState, options);
+  }
+
+  /**
+   * Get rendering options schema for chess
+   */
+  static getRenderingOptionsSchema() {
+    return {
+      type: 'object',
+      properties: {
+        width: { type: 'number', default: 800, minimum: 200, maximum: 2000 },
+        height: { type: 'number', default: 800, minimum: 200, maximum: 2000 },
+        density: { type: 'number', default: 200, minimum: 72, maximum: 300 },
+        showCoordinates: { type: 'boolean', default: true },
+        title: { type: 'string', default: 'Chess Board' },
+        highlightSquares: { 
+          type: 'array', 
+          items: { type: 'string' },
+          description: 'Array of square names to highlight (e.g., ["e4", "d5"])'
+        },
+        lastMove: {
+          type: 'object',
+          properties: {
+            from: { type: 'string' },
+            to: { type: 'string' }
+          },
+          description: 'Last move to highlight on the board'
+        }
+      }
+    };
   }
 }
 

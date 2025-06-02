@@ -4,22 +4,39 @@ class BoardGamePlayer {
         this.socket = null;
         this.currentUser = null;
         this.currentGame = null;
+        this.pluginManager = new GamePluginManager();
         this.init();
     }
 
     async init() {
         this.initializeSocket();
         this.bindEventListeners();
+        this.setupResponsiveHandling();
+        
+        // Check URL parameters for game persistence
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameId = urlParams.get('game');
+        const userId = urlParams.get('user');
         
         // Check if user is already logged in (simple localStorage check)
         const savedUser = localStorage.getItem('boardgame-user');
         if (savedUser) {
             try {
                 this.currentUser = JSON.parse(savedUser);
-                this.showGameList();
+                
+                // If we have a game ID in URL, try to load that game directly
+                if (gameId) {
+                    await this.loadGameFromURL(gameId, userId);
+                } else {
+                    this.showGameList();
+                }
             } catch (error) {
                 localStorage.removeItem('boardgame-user');
+                this.showLoginSection();
             }
+        } else if (gameId && userId) {
+            // If not logged in but URL has user/game params, show login with hint
+            this.showLoginWithGameHint(gameId, userId);
         }
     }
 
@@ -49,6 +66,27 @@ class BoardGamePlayer {
         });
     }
 
+    setupResponsiveHandling() {
+        // Only reload board image on significant resize events to prevent flickering
+        let resizeTimeout;
+        let lastWidth = window.innerWidth;
+        
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (this.currentGame) {
+                    const currentWidth = window.innerWidth;
+                    // Only reload if width changed significantly (more than 100px)
+                    if (Math.abs(currentWidth - lastWidth) > 100) {
+                        console.log('Significant window resize detected, refreshing board image');
+                        lastWidth = currentWidth;
+                        this.loadBoardImage();
+                    }
+                }
+            }, 1000); // Increased debounce to 1 second to reduce flickering
+        });
+    }
+
     updateConnectionStatus(text, type) {
         const statusElement = document.getElementById('connection-status');
         statusElement.innerHTML = `<span class="badge bg-${type}">${text}</span>`;
@@ -75,6 +113,11 @@ class BoardGamePlayer {
         document.getElementById('move-form').addEventListener('submit', (e) => {
             e.preventDefault();
             this.submitMove();
+        });
+
+        // Copy game link
+        document.getElementById('copy-game-link-btn').addEventListener('click', () => {
+            this.copyGameLink();
         });
 
         // Leave game
@@ -193,6 +236,83 @@ class BoardGamePlayer {
         document.getElementById('game-play-section').style.display = 'block';
     }
 
+    showLoginSection() {
+        document.getElementById('login-section').style.display = 'block';
+        document.getElementById('game-list-section').style.display = 'none';
+        document.getElementById('game-play-section').style.display = 'none';
+    }
+
+    showLoginWithGameHint(gameId, userId) {
+        this.showLoginSection();
+        // Add visual hint that there's a game waiting
+        const loginForm = document.getElementById('login-form');
+        if (loginForm) {
+            const existingHint = document.getElementById('game-hint');
+            if (existingHint) existingHint.remove();
+            
+            const hint = document.createElement('div');
+            hint.id = 'game-hint';
+            hint.className = 'alert alert-info mt-2';
+            hint.innerHTML = `<i class="bi bi-info-circle"></i> You have a game link! Login to continue to game ${gameId}`;
+            loginForm.appendChild(hint);
+        }
+    }
+
+    async loadGameFromURL(gameId, userId) {
+        try {
+            // Check if the URL user ID matches current user
+            if (userId && this.currentUser.id !== parseInt(userId)) {
+                console.warn('URL user ID does not match current user, ignoring user parameter');
+            }
+            
+            // Try to load the game
+            const game = await this.fetchAPI(`/api/games/${gameId}`);
+            
+            // Check if current user is in this game
+            const isUserInGame = game.players.some(p => p.userId === this.currentUser.id);
+            
+            if (!isUserInGame) {
+                // Try to join the game if it's still waiting
+                if (game.status === 'waiting') {
+                    await this.joinGameInternal(gameId);
+                } else {
+                    alert('You are not a player in this game');
+                    this.showGameList();
+                    this.clearURLParams();
+                    return;
+                }
+            }
+            
+            // Load the game
+            this.currentGame = game;
+            this.showGamePlay();
+            this.loadCurrentGame();
+            
+            // Join socket room for real-time updates
+            this.socket.emit('join-game', gameId);
+            
+        } catch (error) {
+            console.error('Error loading game from URL:', error);
+            alert('Could not load game: ' + error.message);
+            this.showGameList();
+            this.clearURLParams();
+        }
+    }
+
+    updateURLForGame(gameId) {
+        const url = new URL(window.location);
+        url.searchParams.set('game', gameId);
+        url.searchParams.set('user', this.currentUser.id);
+        window.history.replaceState({}, '', url);
+    }
+
+    clearURLParams() {
+        const url = new URL(window.location);
+        url.searchParams.delete('game');
+        url.searchParams.delete('user');
+        window.history.replaceState({}, '', url);
+    }
+
     async loadAvailableGames() {
         try {
             const games = await this.fetchAPI('/api/games');
@@ -308,29 +428,36 @@ class BoardGamePlayer {
 
     async joinGame(gameId) {
         try {
-            // First, get game details to check if user is already in it
-            const gameDetails = await this.fetchAPI(`/api/games/${gameId}`);
-            const isAlreadyInGame = gameDetails.players.some(p => p.userId === this.currentUser.id);
-            
-            if (!isAlreadyInGame && gameDetails.status === 'waiting') {
-                // Join the game
-                const response = await this.fetchAPI(`/api/games/${gameId}/join`, {
-                    method: 'POST',
-                    body: JSON.stringify({ userId: this.currentUser.id })
-                });
-                console.log('Joined game:', response);
-            }
+            await this.joinGameInternal(gameId);
             
             // Load the game
             this.currentGame = await this.fetchAPI(`/api/games/${gameId}`);
             this.showGamePlay();
             this.loadCurrentGame();
             
+            // Update URL with game parameters for persistence and bookmarking
+            this.updateURLForGame(gameId);
+            
             // Join socket room for real-time updates
             this.socket.emit('join-game', gameId);
             
         } catch (error) {
             alert('Error joining game: ' + error.message);
+        }
+    }
+
+    async joinGameInternal(gameId) {
+        // First, get game details to check if user is already in it
+        const gameDetails = await this.fetchAPI(`/api/games/${gameId}`);
+        const isAlreadyInGame = gameDetails.players.some(p => p.userId === this.currentUser.id);
+        
+        if (!isAlreadyInGame && gameDetails.status === 'waiting') {
+            // Join the game
+            const response = await this.fetchAPI(`/api/games/${gameId}/join`, {
+                method: 'POST',
+                body: JSON.stringify({ userId: this.currentUser.id })
+            });
+            console.log('Joined game:', response);
         }
     }
 
@@ -379,8 +506,35 @@ class BoardGamePlayer {
             // Load move history
             this.loadMoveHistory();
 
+            // Update move input UI for current game type
+            this.updateMoveInputUI();
+
         } catch (error) {
             console.error('Error loading game:', error);
+        }
+    }
+
+    updateMoveInputUI() {
+        // Update move input placeholder and help text based on current game type
+        if (!this.currentGame) return;
+        
+        try {
+            const moveInput = document.getElementById('move-input');
+            const helpText = moveInput.parentElement.querySelector('.form-text');
+            
+            const gameType = this.currentGame.gameType;
+            const placeholder = this.pluginManager.getMoveInputPlaceholder(gameType);
+            const help = this.pluginManager.getMoveInputHelp(gameType);
+            
+            if (moveInput) {
+                moveInput.placeholder = placeholder;
+            }
+            
+            if (helpText) {
+                helpText.textContent = help;
+            }
+        } catch (error) {
+            console.warn('Error updating move input UI:', error);
         }
     }
 
@@ -420,6 +574,15 @@ class BoardGamePlayer {
             boardLoading.style.display = 'block';
             boardImage.style.display = 'none';
             
+            // Calculate optimal image size based on container width
+            const container = boardImage.parentElement;
+            const containerWidth = container.clientWidth;
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            
+            // Request image size based on container size and device pixel ratio
+            // This ensures crisp images on high-DPI displays
+            const requestedSize = Math.min(1200, Math.max(400, containerWidth * devicePixelRatio));
+            
             // Set image source and handle load
             boardImage.onload = () => {
                 boardLoading.style.display = 'none';
@@ -430,7 +593,13 @@ class BoardGamePlayer {
                 boardLoading.innerHTML = '<p class="text-muted">Board image not available</p>';
             };
             
-            boardImage.src = `${this.baseURL}/api/games/${this.currentGame.id}/image?t=${Date.now()}`;
+            // Add size parameters to the image URL
+            const imageUrl = new URL(`${this.baseURL}/api/games/${this.currentGame.id}/image`);
+            imageUrl.searchParams.set('width', requestedSize);
+            imageUrl.searchParams.set('height', requestedSize);
+            imageUrl.searchParams.set('t', Date.now()); // Cache busting
+            
+            boardImage.src = imageUrl.toString();
             
         } catch (error) {
             console.error('Error loading board image:', error);
@@ -468,7 +637,7 @@ class BoardGamePlayer {
                 moveData = move.move;
             }
             
-            const moveText = this.formatMove(moveData);
+            const moveText = this.formatMove(moveData, this.currentGame?.gameType);
             
             return `
                 <div class="mb-1">
@@ -482,17 +651,13 @@ class BoardGamePlayer {
         moveHistory.scrollTop = moveHistory.scrollHeight;
     }
 
-    formatMove(moveData) {
-        // Handle different move formats based on game type
-        if (typeof moveData === 'string') {
-            return moveData;
+    formatMove(moveData, gameType) {
+        // Use plugin manager for game-agnostic move formatting
+        if (!gameType) {
+            // Fallback for when game type is not available
+            return typeof moveData === 'string' ? moveData : JSON.stringify(moveData);
         }
-        
-        if (moveData.from && moveData.to) {
-            return `${moveData.from}-${moveData.to}`;
-        }
-        
-        return JSON.stringify(moveData);
+        return this.pluginManager.formatMove(moveData, gameType);
     }
 
     async submitMove() {
@@ -588,37 +753,8 @@ class BoardGamePlayer {
     }
 
     parseMove(moveText, gameType) {
-        // Simple move parsing - can be enhanced for each game type
-        switch (gameType) {
-            case 'chess':
-                return this.parseChessMove(moveText);
-            case 'checkers':
-                return this.parseCheckersMove(moveText);
-            case 'hearts':
-                return this.parseHeartsMove(moveText);
-            default:
-                return moveText;
-        }
-    }
-
-    parseChessMove(moveText) {
-        // Normalize to lowercase for chess.js library compatibility
-        // The chess.js library is case sensitive and prefers lowercase
-        return moveText.trim().toLowerCase();
-    }
-
-    parseCheckersMove(moveText) {
-        // Handle checkers move format
-        if (moveText.includes('-')) {
-            const [from, to] = moveText.split('-');
-            return { from: from.trim(), to: to.trim() };
-        }
-        return moveText;
-    }
-
-    parseHeartsMove(moveText) {
-        // Handle hearts card play
-        return moveText.toUpperCase();
+        // Use plugin manager for game-agnostic move parsing
+        return this.pluginManager.parseMove(moveText, gameType);
     }
 
     handleMoveUpdate(data) {
@@ -672,8 +808,54 @@ class BoardGamePlayer {
         }, 5000);
     }
 
+    copyGameLink() {
+        if (!this.currentGame || !this.currentUser) {
+            alert('No active game to copy link for');
+            return;
+        }
+
+        const gameUrl = `${window.location.origin}${window.location.pathname}?game=${this.currentGame.id}&user=${this.currentUser.id}`;
+        
+        // Try to use the modern clipboard API
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(gameUrl).then(() => {
+                this.showNotification('Game link copied to clipboard!', 'success');
+            }).catch(err => {
+                console.error('Failed to copy to clipboard:', err);
+                this.fallbackCopyToClipboard(gameUrl);
+            });
+        } else {
+            // Fallback for older browsers or non-secure contexts
+            this.fallbackCopyToClipboard(gameUrl);
+        }
+    }
+
+    fallbackCopyToClipboard(text) {
+        // Create a temporary textarea element
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+            document.execCommand('copy');
+            this.showNotification('Game link copied to clipboard!', 'success');
+        } catch (err) {
+            console.error('Fallback copy failed:', err);
+            // Show the URL in a prompt as last resort
+            prompt('Copy this game link:', text);
+        } finally {
+            document.body.removeChild(textArea);
+        }
+    }
+
     leaveGame() {
         this.currentGame = null;
+        this.clearURLParams(); // Remove game parameters from URL
         this.showGameList();
     }
 
@@ -786,12 +968,13 @@ class BoardGamePlayer {
     }
 
     formatGameType(gameType) {
-        const types = {
-            'chess': 'Chess',
-            'checkers': 'Checkers',
-            'hearts': 'Hearts'
-        };
-        return types[gameType] || gameType.charAt(0).toUpperCase() + gameType.slice(1);
+        // Use plugin manager to get display name
+        try {
+            return this.pluginManager.getDisplayName(gameType);
+        } catch (error) {
+            // Fallback to simple capitalization
+            return gameType ? gameType.charAt(0).toUpperCase() + gameType.slice(1) : 'Game';
+        }
     }
 
     getStatusColor(status) {
