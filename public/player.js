@@ -140,6 +140,11 @@ class BoardGamePlayer {
             this.showTestHelper();
         });
 
+        // Move help toggle
+        document.getElementById('toggle-move-help').addEventListener('click', () => {
+            this.toggleMoveHelp();
+        });
+
         document.getElementById('close-test-alert').addEventListener('click', () => {
             document.getElementById('test-helper-alert').style.display = 'none';
         });
@@ -533,8 +538,114 @@ class BoardGamePlayer {
             if (helpText) {
                 helpText.textContent = help;
             }
+
+            // Update UI based on game-specific configuration
+            this.updateGameSpecificUI(gameType);
+            
         } catch (error) {
             console.warn('Error updating move input UI:', error);
+        }
+    }
+
+    updateGameSpecificUI(gameType) {
+        try {
+            const uiConfig = this.pluginManager.getUIConfig(gameType);
+            
+            // Show/hide switch user button
+            const switchUserBtn = document.getElementById('switch-user-btn');
+            if (switchUserBtn) {
+                switchUserBtn.style.display = uiConfig.showSwitchUserButton ? 'block' : 'none';
+            }
+
+            // Show/hide test move button  
+            const testMoveBtn = document.getElementById('test-move-btn');
+            if (testMoveBtn) {
+                testMoveBtn.style.display = uiConfig.showTestMoveButton ? 'block' : 'none';
+            }
+
+            // Show/hide move help
+            const moveHelpCard = document.getElementById('move-help-card');
+            if (moveHelpCard) {
+                if (uiConfig.showMoveHelp) {
+                    moveHelpCard.style.display = 'block';
+                    this.renderMoveHelp(gameType);
+                } else {
+                    moveHelpCard.style.display = 'none';
+                }
+            }
+
+            // Update turn info for single player games
+            if (uiConfig.singlePlayer) {
+                const waitingInfo = document.getElementById('waiting-info');
+                if (waitingInfo) {
+                    waitingInfo.style.display = 'none';
+                }
+            }
+
+        } catch (error) {
+            console.warn('Error updating game-specific UI:', error);
+        }
+    }
+
+    renderMoveHelp(gameType) {
+        try {
+            const commands = this.pluginManager.getMoveCommands(gameType);
+            const quickRef = this.pluginManager.getQuickReference(gameType);
+            const moveCommandsDiv = document.getElementById('move-commands');
+            
+            if (!moveCommandsDiv || commands.length === 0) return;
+
+            let html = '';
+
+            // Quick reference section
+            if (Object.keys(quickRef).length > 0) {
+                html += '<div class="mb-3"><h6 class="text-muted mb-2">Quick Reference</h6>';
+                html += '<div class="row">';
+                
+                Object.entries(quickRef).forEach(([category, cmds]) => {
+                    html += `<div class="col-6 mb-2">`;
+                    html += `<strong class="d-block small">${category}:</strong>`;
+                    html += `<span class="badge bg-light text-dark me-1 small">${cmds.join('</span> <span class="badge bg-light text-dark me-1 small">')}</span>`;
+                    html += `</div>`;
+                });
+                
+                html += '</div></div>';
+            }
+
+            // Detailed commands
+            commands.forEach(category => {
+                html += `<div class="mb-3">`;
+                html += `<h6 class="text-muted mb-2">${category.category}</h6>`;
+                html += `<div class="table-responsive">`;
+                html += `<table class="table table-sm">`;
+                
+                category.commands.forEach(cmd => {
+                    html += `<tr>`;
+                    html += `<td class="text-nowrap"><code class="small">${cmd.shorthand}</code></td>`;
+                    html += `<td class="small text-muted">${cmd.description}</td>`;
+                    html += `</tr>`;
+                });
+                
+                html += `</table></div></div>`;
+            });
+
+            moveCommandsDiv.innerHTML = html;
+
+        } catch (error) {
+            console.warn('Error rendering move help:', error);
+        }
+    }
+
+    toggleMoveHelp() {
+        const content = document.getElementById('move-help-content');
+        const chevron = document.getElementById('help-chevron');
+        
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            chevron.className = 'bi bi-chevron-up';
+        } else {
+            content.style.display = 'none';
+            chevron.className = 'bi bi-chevron-down';
         }
     }
 
@@ -707,7 +818,7 @@ class BoardGamePlayer {
             
         } catch (error) {
             console.error('Move submission error:', error);
-            alert('Error submitting move: ' + error.message);
+            this.showMoveError(error.message, moveText);
         } finally {
             // Restore button
             submitBtn.innerHTML = originalText;
@@ -748,7 +859,7 @@ class BoardGamePlayer {
             
         } catch (error) {
             console.error('Test move error:', error);
-            alert('Test move error: ' + error.message);
+            this.showMoveError(error.message, moveText);
         }
     }
 
@@ -806,6 +917,60 @@ class BoardGamePlayer {
                 notification.remove();
             }
         }, 5000);
+    }
+
+    showMoveError(errorMessage, attemptedMove) {
+        // Enhanced error display with context and suggestions
+        const gameType = this.currentGame?.gameType || 'unknown';
+        
+        // Create detailed error message with context
+        let detailedMessage = `<strong>Move Failed:</strong> "${attemptedMove}"<br>`;
+        detailedMessage += `<strong>Reason:</strong> ${errorMessage}<br>`;
+        
+        // Add game-specific help based on error type
+        if (gameType === 'solitaire') {
+            detailedMessage += '<br><strong>Try instead:</strong><br>';
+            
+            if (errorMessage.includes('Stock pile is empty')) {
+                detailedMessage += '• Type "r" or "reset" to reset the stock pile';
+            } else if (errorMessage.includes('Foundation must start with Ace')) {
+                detailedMessage += '• Foundations start with Ace (A), try moving an Ace first';
+            } else if (errorMessage.includes('Expected') && errorMessage.includes('got')) {
+                detailedMessage += '• Foundation cards must go in order: A, 2, 3... J, Q, K';
+            } else if (errorMessage.includes('Empty tableau column must start with King')) {
+                detailedMessage += '• Only Kings can be placed on empty tableau columns';
+            } else if (errorMessage.includes('Cards must alternate color')) {
+                detailedMessage += '• Tableau cards must alternate red/black (e.g., red 7 on black 8)';
+            } else if (errorMessage.includes('face-down card')) {
+                detailedMessage += '• Flip the card first with "f1" through "f7"';
+            } else if (errorMessage.includes('Unrecognized move format')) {
+                detailedMessage += '• Use shortcuts: "d" (draw), "wh" (waste→hearts), "1-7" (tableau moves)';
+            }
+            
+            detailedMessage += '<br><small class="text-muted">See Move Commands panel for all available commands</small>';
+        }
+        
+        // Show as a more prominent error notification
+        const errorAlert = document.createElement('div');
+        errorAlert.className = 'alert alert-danger alert-dismissible fade show position-fixed';
+        errorAlert.style.cssText = 'top: 80px; right: 20px; z-index: 9999; max-width: 400px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);';
+        errorAlert.innerHTML = `
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            ${detailedMessage}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(errorAlert);
+        
+        // Auto-remove after 8 seconds (longer for error messages)
+        setTimeout(() => {
+            if (errorAlert.parentNode) {
+                errorAlert.remove();
+            }
+        }, 8000);
+        
+        // Also log to console for debugging
+        console.warn(`Move error - Game: ${gameType}, Attempted: "${attemptedMove}", Error: ${errorMessage}`);
     }
 
     copyGameLink() {

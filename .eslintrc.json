@@ -1,0 +1,35 @@
+{
+  "env": {
+    "node": true,
+    "es2021": true,
+    "jest": true
+  },
+  "extends": [
+    "eslint:recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "script"
+  },
+  "rules": {
+    "indent": "off",
+    "linebreak-style": ["error", "unix"],
+    "quotes": "off",
+    "semi": ["error", "always"],
+    "no-unused-vars": "off",
+    "no-console": "off",
+    "prefer-const": "off",
+    "no-var": "error",
+    "no-undef": "error",
+    "no-prototype-builtins": "off",
+    "no-case-declarations": "off",
+    "no-restricted-syntax": "off"
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    "coverage/",
+    "data/",
+    "public/",
+    "scripts/"
+  ]
+}

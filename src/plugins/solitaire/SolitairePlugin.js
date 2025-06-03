@@ -130,7 +130,7 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
    */
   validateDrawStock(boardState) {
     if (boardState.stock.length === 0) {
-      return { valid: false, error: 'Stock pile is empty' };
+      return { valid: false, error: 'Stock pile is empty - no more cards to draw. Try "r" to reset from waste pile' };
     }
     return { valid: true };
   }
@@ -140,10 +140,10 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
    */
   validateResetStock(boardState) {
     if (boardState.stock.length > 0) {
-      return { valid: false, error: 'Stock pile is not empty' };
+      return { valid: false, error: 'Cannot reset - stock pile still has cards. Draw all cards first with "d"' };
     }
     if (boardState.waste.length === 0) {
-      return { valid: false, error: 'Waste pile is empty' };
+      return { valid: false, error: 'Cannot reset - waste pile is empty. Draw some cards first with "d"' };
     }
     return { valid: true };
   }
@@ -161,11 +161,13 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
     // Get source cards
     const sourceCards = this.getCardsFromLocation(from, boardState);
     if (!sourceCards || sourceCards.length === 0) {
-      return { valid: false, error: 'No cards at source location' };
+      const locationName = this.formatLocationName(from);
+      return { valid: false, error: `No cards available at ${locationName}` };
     }
 
     if (cardCount > sourceCards.length) {
-      return { valid: false, error: 'Not enough cards at source location' };
+      const locationName = this.formatLocationName(from);
+      return { valid: false, error: `Not enough cards at ${locationName} - only ${sourceCards.length} available, tried to move ${cardCount}` };
     }
 
     // Get the cards being moved
@@ -202,12 +204,12 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
 
     const column = boardState.tableau[from.column];
     if (!column || column.length === 0) {
-      return { valid: false, error: 'Empty tableau column' };
+      return { valid: false, error: `Tableau column ${from.column + 1} is empty - no cards to flip` };
     }
 
     const topCard = column[column.length - 1];
     if (topCard.faceUp) {
-      return { valid: false, error: 'Card is already face-up' };
+      return { valid: false, error: `Card in tableau ${from.column + 1} is already face-up - try moving it instead` };
     }
 
     return { valid: true };
@@ -231,21 +233,21 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
     if (foundationPile.length === 0) {
       // Foundation must start with Ace
       if (card.rank !== 'Ace') {
-        return { valid: false, error: 'Foundation must start with Ace' };
+        return { valid: false, error: `Foundation piles must start with Ace - cannot place ${card.rank} of ${card.suit} on empty ${to.suit} foundation` };
       }
       if (card.suit !== to.suit) {
-        return { valid: false, error: 'Card suit must match foundation suit' };
+        return { valid: false, error: `Wrong suit - ${card.suit} card cannot go on ${to.suit} foundation` };
       }
     } else {
       // Must be same suit and next rank
       const topCard = foundationPile[foundationPile.length - 1];
       if (card.suit !== topCard.suit) {
-        return { valid: false, error: 'Card must match foundation suit' };
+        return { valid: false, error: `Wrong suit - ${card.suit} card cannot go on ${topCard.suit} foundation (must match)` };
       }
       
       const expectedRank = this.getNextRank(topCard.rank);
       if (card.rank !== expectedRank) {
-        return { valid: false, error: `Expected ${expectedRank}, got ${card.rank}` };
+        return { valid: false, error: `Wrong rank - expected ${expectedRank} of ${to.suit}, got ${card.rank} (foundation sequence: A,2,3,4,5,6,7,8,9,10,J,Q,K)` };
       }
     }
 
@@ -262,7 +264,7 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
       // Empty column can only accept King
       const firstCard = cardsToMove[0];
       if (firstCard.rank !== 'King') {
-        return { valid: false, error: 'Empty tableau column must start with King' };
+        return { valid: false, error: `Empty tableau column ${to.column + 1} can only accept Kings - cannot place ${firstCard.rank} of ${firstCard.suit}` };
       }
     } else {
       // Must be descending rank and alternating color
@@ -270,16 +272,19 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
       const firstCard = cardsToMove[0];
       
       if (!topCard.faceUp) {
-        return { valid: false, error: 'Cannot place cards on face-down card' };
+        return { valid: false, error: `Cannot place cards on face-down card in tableau ${to.column + 1} - flip it first with "f${to.column + 1}"` };
       }
       
       const expectedRank = this.getPreviousRank(topCard.rank);
       if (firstCard.rank !== expectedRank) {
-        return { valid: false, error: `Expected ${expectedRank}, got ${firstCard.rank}` };
+        const topCardColor = CardUtils.isRed(topCard) ? 'red' : 'black';
+        return { valid: false, error: `Wrong rank - expected ${expectedRank} on ${topCard.rank}, got ${firstCard.rank} (tableau sequence: K,Q,J,10,9,8,7,6,5,4,3,2,A)` };
       }
       
       if (CardUtils.isRed(topCard) === CardUtils.isRed(firstCard)) {
-        return { valid: false, error: 'Cards must alternate color' };
+        const topCardColor = CardUtils.isRed(topCard) ? 'red' : 'black';
+        const firstCardColor = CardUtils.isRed(firstCard) ? 'red' : 'black';
+        return { valid: false, error: `Wrong color - cannot place ${firstCardColor} ${firstCard.rank} on ${topCardColor} ${topCard.rank} (must alternate red/black)` };
       }
     }
 
@@ -629,6 +634,56 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
     }
     
     return 0; // No time bonus
+  }
+
+  /**
+   * Format location name for error messages
+   */
+  formatLocationName(location) {
+    if (!location || !location.type) return 'unknown location';
+    
+    switch (location.type) {
+      case 'waste': return 'waste pile';
+      case 'stock': return 'stock pile';
+      case 'foundation': return `${location.suit} foundation`;
+      case 'tableau': return `tableau column ${(location.column || 0) + 1}`;
+      default: return location.type;
+    }
+  }
+
+  /**
+   * Generate board image for solitaire game
+   * Uses plugin renderer if available, falls back to basic representation
+   */
+  static async generateBoardImage(boardState, options = {}) {
+    try {
+      // Try to use plugin renderer if available
+      const renderer = require('./SolitaireRenderer');
+      return await renderer.generateBoardImage(boardState, options);
+    } catch (error) {
+      // Fallback: Return a basic text representation  
+      console.warn('SolitaireRenderer not available, using fallback:', error.message);
+      
+      // Create a basic text representation
+      const foundation = boardState.foundation || { hearts: [], diamonds: [], clubs: [], spades: [] };
+      const stock = boardState.stock || [];
+      const waste = boardState.waste || [];
+      const tableau = boardState.tableau || [];
+      const score = boardState.score || { points: 0 };
+      const moves = boardState.moves || [];
+      
+      return {
+        type: 'text',
+        content: `Solitaire Game
+Foundation: H:${foundation.hearts.length} D:${foundation.diamonds.length} C:${foundation.clubs.length} S:${foundation.spades.length}
+Stock: ${stock.length} cards | Waste: ${waste.length} cards
+Tableau columns: ${tableau.map(col => col.length).join(', ')}
+Score: ${score.points} | Moves: ${moves.length}
+Status: In Progress`,
+        width: 400,
+        height: 200
+      };
+    }
   }
 }
 
