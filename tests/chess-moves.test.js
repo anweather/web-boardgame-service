@@ -5,24 +5,43 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 
-const gameRoutes = require('../src/routes/games');
-const userRoutes = require('../src/routes/users');
 const { initializeDatabase, closeDatabase } = require('../src/database/init');
+const dependencies = require('../src/config/dependencies');
 
 // Create test app
 function createTestApp() {
   const app = express();
   const server = createServer(app);
-  const io = new Server(server);
+  const io = new Server(server, {
+    cors: {
+      origin: "http://localhost:3000",
+      methods: ["GET", "POST"]
+    }
+  });
 
-  app.use(helmet());
+  // Set up dependency injection with Socket.IO
+  dependencies.setSocketIo(io);
+
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        "script-src": ["'self'", "https://cdn.jsdelivr.net"],
+        "style-src": ["'self'", "https://cdn.jsdelivr.net", "'unsafe-inline'"],
+        "font-src": ["'self'", "ws:", "wss:"],
+        "upgrade-insecure-requests": null
+      }
+    }
+  }));
   app.use(cors());
   app.use(express.json());
 
-  app.use('/api/games', gameRoutes);
-  app.use('/api/users', userRoutes);
+  // Get routers from dependency container
+  const routers = dependencies.getRouters();
 
-  app.set('socketio', io);
+  // Routes using new architecture
+  app.use('/api/games', routers.games);
+  app.use('/api/users', routers.users);
 
   return { app, server, io };
 }

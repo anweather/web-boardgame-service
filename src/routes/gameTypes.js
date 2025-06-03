@@ -7,10 +7,10 @@ const router = express.Router();
 router.get('/', (req, res) => {
   try {
     const pluginRegistry = dependencies.getGamePluginRegistry();
-    const gameTypes = pluginRegistry.getAvailableGameTypes().map(gameType => {
-      const plugin = pluginRegistry.getPlugin(gameType);
+    const gameTypes = pluginRegistry.getAvailableGameTypes().map(gameTypeData => {
+      const plugin = pluginRegistry.getPlugin(gameTypeData.type);
       return {
-        type: gameType,
+        type: gameTypeData.type,
         name: plugin.getDisplayName(),
         description: plugin.getDescription(),
         minPlayers: plugin.getMinPlayers(),
