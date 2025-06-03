@@ -42,11 +42,31 @@ app.use(express.json());
 // Serve static files from public directory
 app.use(express.static('public'));
 
-// Rate limiting
+// Rate limiting - more lenient for development
+const isDevelopment = process.env.NODE_ENV !== 'production';
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: isDevelopment ? 1000 : 100, // Much higher limit for development
+  message: {
+    error: 'Too many requests from this IP, please try again later.',
+    retryAfter: Math.ceil((15 * 60 * 1000) / 1000) // seconds
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  skip: (req) => {
+    // Skip rate limiting for health checks and static files
+    return req.path === '/health' || req.path.startsWith('/css') || req.path.startsWith('/js') || req.path.startsWith('/images');
+  },
+  handler: (req, res) => {
+    console.warn(`Rate limit exceeded for IP ${req.ip} on ${req.method} ${req.path}`);
+    res.status(429).json({
+      error: 'Too many requests from this IP, please try again later.',
+      retryAfter: Math.ceil((15 * 60 * 1000) / 1000)
+    });
+  }
 });
+
+console.log(`Rate limiting configured: ${isDevelopment ? '1000' : '100'} requests per 15 minutes (${isDevelopment ? 'development' : 'production'} mode)`);
 app.use('/api/', limiter);
 
 // Get routers from dependency container
