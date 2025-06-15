@@ -244,6 +244,10 @@ class ChessLayout {
 
     handleSquareClick(row, col, squareName, squareElement) {
         console.log(`Clicked square: ${squareName} (${row}, ${col})`);
+        
+        const board = this.getBoardArray();
+        const piece = board[row][col];
+        console.log(`Piece at ${squareName}: ${piece}`);
 
         // Check if this is a valid move target
         if (this.selectedSquare && this.isValidMove(this.selectedSquare, squareName)) {
@@ -252,16 +256,15 @@ class ChessLayout {
         }
 
         // Check if there's a piece on this square that belongs to the current player
-        const board = this.getBoardArray();
-        const piece = board[row][col];
-        
         if (piece && this.isPieceOwnedByCurrentPlayer(piece)) {
+            console.log(`Selecting piece ${piece} at ${squareName}`);
             this.selectSquare(squareName, squareElement);
         } else if (this.selectedSquare) {
             // Try to move to empty square or capture
             if (this.isValidMove(this.selectedSquare, squareName)) {
                 this.makeMove(this.selectedSquare, squareName);
             } else {
+                console.log(`Invalid move or clearing selection`);
                 this.clearSelection();
             }
         }
@@ -298,13 +301,18 @@ class ChessLayout {
         const fromPos = this.parseSquareName(fromSquare);
         const piece = board[fromPos.row][fromPos.col];
 
+        console.log(`Highlighting moves for ${piece} at ${fromSquare} (row: ${fromPos.row}, col: ${fromPos.col})`);
+
         if (!piece) return;
 
         // Get basic movement patterns for the piece
         const possibleMoves = this.getPossibleMoves(piece, fromPos, board);
 
+        console.log(`Found ${possibleMoves.length} possible moves:`, possibleMoves);
+
         possibleMoves.forEach(move => {
             const square = document.querySelector(`[data-square="${move.to}"]`);
+            console.log(`Looking for square ${move.to}, found:`, square);
             if (square) {
                 if (move.isCapture) {
                     square.classList.add('valid-capture');
@@ -347,19 +355,30 @@ class ChessLayout {
 
     getPawnMoves(fromPos, isWhite, board) {
         const moves = [];
+        // White pawns move "up" the board (decreasing row numbers: 6->5->4->etc)
+        // Black pawns move "down" the board (increasing row numbers: 1->2->3->etc)
         const direction = isWhite ? -1 : 1;
         const startRow = isWhite ? 6 : 1;
         
+        console.log(`Pawn move calculation: ${isWhite ? 'white' : 'black'} pawn at row ${fromPos.row}, col ${fromPos.col}, direction ${direction}`);
+        
         // Forward move
         const oneForward = { row: fromPos.row + direction, col: fromPos.col };
+        console.log(`One forward: row ${oneForward.row}, col ${oneForward.col}`);
+        
         if (this.isPositionValid(oneForward) && !board[oneForward.row][oneForward.col]) {
-            moves.push({ to: this.getSquareName(oneForward.row, oneForward.col), isCapture: false });
+            const moveSquare = this.getSquareName(oneForward.row, oneForward.col);
+            console.log(`Adding one forward move to ${moveSquare}`);
+            moves.push({ to: moveSquare, isCapture: false });
             
             // Two squares forward from starting position
             if (fromPos.row === startRow) {
                 const twoForward = { row: fromPos.row + 2 * direction, col: fromPos.col };
+                console.log(`Two forward: row ${twoForward.row}, col ${twoForward.col}`);
                 if (this.isPositionValid(twoForward) && !board[twoForward.row][twoForward.col]) {
-                    moves.push({ to: this.getSquareName(twoForward.row, twoForward.col), isCapture: false });
+                    const twoMoveSquare = this.getSquareName(twoForward.row, twoForward.col);
+                    console.log(`Adding two forward move to ${twoMoveSquare}`);
+                    moves.push({ to: twoMoveSquare, isCapture: false });
                 }
             }
         }
@@ -371,10 +390,13 @@ class ChessLayout {
         [captureLeft, captureRight].forEach(pos => {
             if (this.isPositionValid(pos) && board[pos.row][pos.col] && 
                 this.isPieceOpponent(board[pos.row][pos.col], isWhite)) {
-                moves.push({ to: this.getSquareName(pos.row, pos.col), isCapture: true });
+                const captureSquare = this.getSquareName(pos.row, pos.col);
+                console.log(`Adding capture move to ${captureSquare}`);
+                moves.push({ to: captureSquare, isCapture: true });
             }
         });
         
+        console.log(`Total pawn moves: ${moves.length}`, moves);
         return moves;
     }
 
@@ -527,7 +549,9 @@ class ChessLayout {
         if (!this.gamePlayer.currentGame || !this.gamePlayer.currentUser) return false;
 
         const isWhite = piece === piece.toUpperCase();
-        return this.isCurrentPlayerWhite() === isWhite;
+        const currentPlayerIsWhite = this.isCurrentPlayerWhite();
+        console.log(`Piece ${piece} is ${isWhite ? 'white' : 'black'}, current player is ${currentPlayerIsWhite ? 'white' : 'black'}, owned: ${currentPlayerIsWhite === isWhite}`);
+        return currentPlayerIsWhite === isWhite;
     }
 
     isPieceOpponent(piece, isCurrentPlayerWhite) {
@@ -540,7 +564,9 @@ class ChessLayout {
         if (!this.gamePlayer.currentGame || !this.gamePlayer.currentUser) return true;
 
         const currentPlayer = this.gamePlayer.currentGame.players.find(p => p.userId === this.gamePlayer.currentUser.id);
-        return currentPlayer && currentPlayer.color === 'white';
+        const isWhite = currentPlayer && currentPlayer.color === 'white';
+        console.log(`Current player:`, currentPlayer, `is white: ${isWhite}`);
+        return isWhite;
     }
 
     updateBoardState(boardState) {
