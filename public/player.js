@@ -5,6 +5,7 @@ class BoardGamePlayer {
         this.currentUser = null;
         this.currentGame = null;
         this.pluginManager = new GamePluginManager();
+        this.currentLayout = null;
         this.init();
     }
 
@@ -145,6 +146,9 @@ class BoardGamePlayer {
             this.toggleMoveHelp();
         });
 
+        // GUI move input handlers
+        this.bindGUIMoveInputHandlers();
+
         document.getElementById('close-test-alert').addEventListener('click', () => {
             document.getElementById('test-helper-alert').style.display = 'none';
         });
@@ -164,6 +168,11 @@ class BoardGamePlayer {
 
         document.getElementById('quick-anweather-btn').addEventListener('click', () => {
             this.quickLogin('anweather', '123456');
+        });
+
+        // Logout button
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            this.handleLogout();
         });
 
         // Event delegation for dynamic elements
@@ -226,6 +235,37 @@ class BoardGamePlayer {
         } catch (error) {
             alert('Registration failed: ' + error.message);
         }
+    }
+
+    handleLogout() {
+        // Clear user data
+        this.currentUser = null;
+        this.currentGame = null;
+        
+        // Clear layout if exists
+        if (this.currentLayout) {
+            this.currentLayout.destroy();
+            this.currentLayout = null;
+        }
+        
+        // Clear localStorage
+        localStorage.removeItem('boardgame-user');
+        
+        // Clear URL parameters
+        this.clearURLParams();
+        
+        // Hide user info
+        document.getElementById('user-info').style.display = 'none';
+        document.getElementById('username-display').textContent = '';
+        
+        // Reset login form
+        document.getElementById('login-form').reset();
+        
+        // Show login section
+        this.showLoginSection();
+        
+        // Show success message
+        this.showNotification('Logged out successfully', 'info');
     }
 
     showGameList() {
@@ -473,6 +513,9 @@ class BoardGamePlayer {
             // Refresh game state
             this.currentGame = await this.fetchAPI(`/api/games/${this.currentGame.id}`);
             
+            console.log('Loaded current game:', this.currentGame);
+            console.log('Board state:', this.currentGame.boardState);
+            
             // Update UI
             document.getElementById('game-title').textContent = this.currentGame.name || 'Unnamed Game';
             document.getElementById('game-type').textContent = this.formatGameType(this.currentGame.gameType);
@@ -514,6 +557,14 @@ class BoardGamePlayer {
             // Update move input UI for current game type
             this.updateMoveInputUI();
 
+            // Load game-specific layout if available
+            this.loadGameLayout();
+
+            // Update layout with current board state
+            if (this.currentGame && this.currentGame.boardState) {
+                this.updateLayoutBoardState(this.currentGame.boardState);
+            }
+
         } catch (error) {
             console.error('Error loading game:', error);
         }
@@ -542,6 +593,11 @@ class BoardGamePlayer {
             // Update UI based on game-specific configuration
             this.updateGameSpecificUI(gameType);
             
+            // Update GUI button states if in GUI mode
+            if (this.currentInputMode === 'gui') {
+                this.updateGUISubmitButton();
+            }
+            
         } catch (error) {
             console.warn('Error updating move input UI:', error);
         }
@@ -551,16 +607,23 @@ class BoardGamePlayer {
         try {
             const uiConfig = this.pluginManager.getUIConfig(gameType);
             
+            // Switch between text and GUI input modes
+            this.updateMoveInputMode(gameType, uiConfig);
+            
             // Show/hide switch user button
             const switchUserBtn = document.getElementById('switch-user-btn');
-            if (switchUserBtn) {
+            const guiSwitchUserBtn = document.getElementById('gui-switch-user-btn');
+            if (switchUserBtn && guiSwitchUserBtn) {
                 switchUserBtn.style.display = uiConfig.showSwitchUserButton ? 'block' : 'none';
+                guiSwitchUserBtn.style.display = uiConfig.showSwitchUserButton ? 'block' : 'none';
             }
 
             // Show/hide test move button  
             const testMoveBtn = document.getElementById('test-move-btn');
-            if (testMoveBtn) {
+            const guiTestMoveBtn = document.getElementById('gui-test-move-btn');
+            if (testMoveBtn && guiTestMoveBtn) {
                 testMoveBtn.style.display = uiConfig.showTestMoveButton ? 'block' : 'none';
+                guiTestMoveBtn.style.display = uiConfig.showTestMoveButton ? 'block' : 'none';
             }
 
             // Show/hide move help
@@ -584,6 +647,224 @@ class BoardGamePlayer {
 
         } catch (error) {
             console.warn('Error updating game-specific UI:', error);
+        }
+    }
+
+    updateMoveInputMode(gameType, uiConfig) {
+        const textInput = document.getElementById('text-move-input');
+        const guiInput = document.getElementById('gui-move-input');
+        
+        if (!textInput || !guiInput) return;
+
+        // Use GUI mode for solitaire, text mode for other games
+        const useGUIMode = gameType === 'solitaire' && uiConfig.singlePlayer;
+        
+        if (useGUIMode) {
+            textInput.style.display = 'none';
+            guiInput.style.display = 'block';
+            this.currentInputMode = 'gui';
+        } else {
+            textInput.style.display = 'block';
+            guiInput.style.display = 'none';
+            this.currentInputMode = 'text';
+        }
+    }
+
+    bindGUIMoveInputHandlers() {
+        // Selected move state
+        this.selectedMove = null;
+        
+        // Handle all move buttons with data-move attribute
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('[data-move]')) {
+                const button = e.target.closest('[data-move]');
+                const moveCommand = button.getAttribute('data-move');
+                this.selectGUIMove(moveCommand);
+            }
+        });
+
+        // Handle tableau to tableau moves
+        document.getElementById('tableau-move-btn').addEventListener('click', () => {
+            this.handleTableauMove();
+        });
+
+        // Handle GUI submit button
+        document.getElementById('gui-submit-move-btn').addEventListener('click', () => {
+            this.submitGUIMove();
+        });
+
+        // Handle GUI test button
+        document.getElementById('gui-test-move-btn').addEventListener('click', () => {
+            this.testGUIMove();
+        });
+
+        // Handle GUI switch user button
+        document.getElementById('gui-switch-user-btn').addEventListener('click', () => {
+            this.switchUser();
+        });
+
+        // Handle clear move button
+        document.getElementById('clear-move-btn').addEventListener('click', () => {
+            this.clearSelectedMove();
+        });
+
+        // Auto-update tableau selects when columns change
+        document.getElementById('from-column').addEventListener('change', () => {
+            this.updateTableauMoveButton();
+        });
+        document.getElementById('to-column').addEventListener('change', () => {
+            this.updateTableauMoveButton();
+        });
+    }
+
+    selectGUIMove(moveCommand) {
+        this.selectedMove = moveCommand;
+        this.updateSelectedMoveDisplay();
+        this.updateGUISubmitButton();
+        this.updateButtonSelectionUI();
+    }
+
+    updateButtonSelectionUI() {
+        // Remove selected class from all GUI move buttons
+        document.querySelectorAll('.gui-move-btn').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+        
+        // Add selected class to the button with the current move
+        if (this.selectedMove) {
+            const selectedButton = document.querySelector(`[data-move="${this.selectedMove}"]`);
+            if (selectedButton) {
+                selectedButton.classList.add('selected');
+            }
+        }
+    }
+
+    handleTableauMove() {
+        const fromColumn = document.getElementById('from-column').value;
+        const toColumn = document.getElementById('to-column').value;
+        
+        if (fromColumn && toColumn && fromColumn !== toColumn) {
+            // Create the move command (system will auto-detect optimal card count)
+            const moveCommand = `${fromColumn}-${toColumn}`;
+            this.selectGUIMove(moveCommand);
+            
+            // Reset selects
+            document.getElementById('from-column').value = '';
+            document.getElementById('to-column').value = '';
+            this.updateTableauMoveButton();
+        }
+    }
+
+    updateTableauMoveButton() {
+        const fromColumn = document.getElementById('from-column').value;
+        const toColumn = document.getElementById('to-column').value;
+        const button = document.getElementById('tableau-move-btn');
+        
+        button.disabled = !fromColumn || !toColumn || fromColumn === toColumn;
+    }
+
+    updateSelectedMoveDisplay() {
+        const display = document.getElementById('selected-move-display');
+        const text = document.getElementById('selected-move-text');
+        
+        if (this.selectedMove) {
+            text.textContent = this.selectedMove;
+            display.style.display = 'block';
+        } else {
+            display.style.display = 'none';
+        }
+    }
+
+    updateGUISubmitButton() {
+        const button = document.getElementById('gui-submit-move-btn');
+        const isMyTurn = this.currentGame?.currentPlayerId === this.currentUser?.id;
+        const isActive = this.currentGame?.status === 'active';
+        
+        button.disabled = !this.selectedMove || !isMyTurn || !isActive;
+    }
+
+    clearSelectedMove() {
+        this.selectedMove = null;
+        this.updateSelectedMoveDisplay();
+        this.updateGUISubmitButton();
+        this.updateButtonSelectionUI();
+    }
+
+    async submitGUIMove() {
+        if (!this.selectedMove || !this.currentGame) {
+            return;
+        }
+
+        console.log('Submitting GUI move:', this.selectedMove);
+        
+        // Use the same logic as text submission but with selected move
+        const moveText = this.selectedMove;
+        
+        // Disable button to prevent double submission
+        const submitBtn = document.getElementById('gui-submit-move-btn');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Submitting...';
+
+        try {
+            // Parse move based on game type
+            const move = this.parseMove(moveText, this.currentGame.gameType);
+            
+            console.log('Parsed GUI move:', move);
+            
+            const response = await this.fetchAPI(`/api/games/${this.currentGame.id}/move`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    userId: this.currentUser.id,
+                    move: move
+                })
+            });
+
+            console.log('GUI move submitted successfully:', response);
+            
+            // Clear selected move and refresh
+            this.clearSelectedMove();
+            this.loadCurrentGame();
+            
+        } catch (error) {
+            console.error('GUI move submission error:', error);
+            this.showMoveError(error.message, moveText);
+        } finally {
+            // Restore button
+            submitBtn.innerHTML = originalText;
+            this.updateGUISubmitButton(); // Re-enable based on state
+        }
+    }
+
+    async testGUIMove() {
+        if (!this.selectedMove || !this.currentGame) {
+            return;
+        }
+
+        console.log('Testing GUI move:', this.selectedMove);
+        
+        const moveText = this.selectedMove;
+
+        try {
+            const move = this.parseMove(moveText, this.currentGame.gameType);
+            
+            console.log('Test GUI move - parsed:', move);
+            
+            const response = await this.fetchAPI(`/api/games/${this.currentGame.id}/move`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    userId: this.currentUser.id,
+                    move: move
+                })
+            });
+
+            console.log('Test GUI move submitted successfully:', response);
+            this.clearSelectedMove();
+            this.loadCurrentGame();
+            
+        } catch (error) {
+            console.error('Test GUI move error:', error);
+            this.showMoveError(error.message, moveText);
         }
     }
 
@@ -1150,6 +1431,96 @@ class BoardGamePlayer {
             'cancelled': 'danger'
         };
         return colors[status] || 'secondary';
+    }
+
+    /**
+     * Load game-specific layout if available
+     */
+    loadGameLayout() {
+        if (!this.currentGame) return;
+
+        const gameType = this.currentGame.gameType;
+        
+        // Clean up existing layout
+        if (this.currentLayout) {
+            this.currentLayout.destroy();
+            this.currentLayout = null;
+        }
+
+        // Load game-specific layout
+        try {
+            switch (gameType) {
+                case 'solitaire':
+                    this.loadSolitaireLayout();
+                    break;
+                case 'chess':
+                    this.loadChessLayout();
+                    break;
+                default:
+                    // Use default layout (current board image + GUI controls)
+                    console.log(`Using default layout for game type: ${gameType}`);
+            }
+        } catch (error) {
+            console.warn(`Failed to load layout for ${gameType}:`, error);
+            // Fallback to default layout
+        }
+    }
+
+    /**
+     * Load solitaire-specific layout
+     */
+    loadSolitaireLayout() {
+        // Check if SolitaireLayout is available
+        if (typeof SolitaireLayout === 'undefined') {
+            console.warn('SolitaireLayout not available, using default layout');
+            return;
+        }
+
+        try {
+            this.currentLayout = new SolitaireLayout(this);
+            console.log('Loaded solitaire-specific layout');
+            
+            // Update the layout with current board state
+            if (this.currentGame && this.currentGame.boardState) {
+                this.currentLayout.updateBoardState(this.currentGame.boardState);
+            }
+        } catch (error) {
+            console.error('Failed to initialize solitaire layout:', error);
+            this.currentLayout = null;
+        }
+    }
+
+    /**
+     * Load chess-specific layout
+     */
+    loadChessLayout() {
+        // Check if ChessLayout is available
+        if (typeof ChessLayout === 'undefined') {
+            console.warn('ChessLayout not available, using default layout');
+            return;
+        }
+
+        try {
+            this.currentLayout = new ChessLayout(this);
+            console.log('Loaded chess-specific layout');
+            
+            // Update the layout with current board state
+            if (this.currentGame && this.currentGame.boardState) {
+                this.currentLayout.updateBoardState(this.currentGame.boardState);
+            }
+        } catch (error) {
+            console.error('Failed to initialize chess layout:', error);
+            this.currentLayout = null;
+        }
+    }
+
+    /**
+     * Update current layout with new board state
+     */
+    updateLayoutBoardState(boardState) {
+        if (this.currentLayout && this.currentLayout.updateBoardState) {
+            this.currentLayout.updateBoardState(boardState);
+        }
     }
 
     async fetchAPI(endpoint, options = {}) {
