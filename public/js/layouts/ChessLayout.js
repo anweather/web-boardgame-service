@@ -536,7 +536,12 @@ class ChessLayout {
 
             console.log('Move submitted successfully:', response);
             
-            // Refresh game state
+            // Update board state if provided in response
+            if (response.newBoardState) {
+                this.updateBoardState(response.newBoardState);
+            }
+            
+            // Refresh game state (this will skip board image loading due to active layout)
             this.gamePlayer.loadCurrentGame();
             
         } catch (error) {

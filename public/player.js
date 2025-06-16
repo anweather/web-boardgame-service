@@ -960,8 +960,20 @@ class BoardGamePlayer {
 
     async loadBoardImage() {
         try {
+            // Skip loading board image if there's an active layout (e.g., chess, solitaire)
+            if (this.currentLayout) {
+                console.log('Skipping board image load - interactive layout is active');
+                return;
+            }
+
             const boardImage = document.getElementById('board-image');
             const boardLoading = document.getElementById('board-loading');
+            
+            // Check if elements exist (they might be replaced by interactive layouts)
+            if (!boardImage || !boardLoading) {
+                console.log('Board image elements not found - likely replaced by interactive layout');
+                return;
+            }
             
             boardLoading.style.display = 'block';
             boardImage.style.display = 'none';
