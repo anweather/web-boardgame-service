@@ -12,10 +12,11 @@ class DeckManager {
    * @param {Object} config - Deck configuration options
    * @param {number} config.includeJokers - Number of jokers to include (default: 0)
    * @param {string[]} config.excludeCards - Card identifiers to exclude
+   * @param {boolean} config.shuffled - Whether to shuffle the deck (default: false)
    * @returns {Object} Deck object
    */
   static createStandardDeck(config = {}) {
-    const { includeJokers = 0, excludeCards = [] } = config;
+    const { includeJokers = 0, excludeCards = [], shuffled = false } = config;
     
     if (includeJokers < 0) {
       throw new Error('Invalid joker count');
@@ -50,12 +51,19 @@ class DeckManager {
       }
     });
 
-    return {
+    const deck = {
       cards,
       discardPile: [],
       shuffled: false,
       deckType: 'standard'
     };
+
+    // Shuffle if requested
+    if (shuffled) {
+      this.shuffle(deck);
+    }
+
+    return deck;
   }
 
   /**

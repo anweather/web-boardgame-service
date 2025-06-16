@@ -153,7 +153,7 @@ describe('SolitairePlugin', () => {
       const resetMove = { action: 'reset_stock' };
       const result = plugin.validateMove(resetMove, boardState, 'player1', mockPlayers);
       expect(result.valid).toBe(false);
-      expect(result.error).toContain('not empty');
+      expect(result.error).toContain('still has cards');
     });
   });
 
@@ -256,7 +256,7 @@ describe('SolitairePlugin', () => {
       
       const result = plugin.validateMove(move, boardState, 'player1', mockPlayers);
       expect(result.valid).toBe(false);
-      expect(result.error).toContain('alternate color');
+      expect(result.error).toContain('alternate red/black');
     });
 
     test('validates King on empty tableau column', () => {
@@ -290,6 +290,177 @@ describe('SolitairePlugin', () => {
       const result = plugin.validateMove(move, boardState, 'player1', mockPlayers);
       expect(result.valid).toBe(false);
       expect(result.error).toContain('King');
+    });
+  });
+
+  describe('Move Validation - Multi-Card Moves', () => {
+    test('calculates maximum movable cards in valid sequence', () => {
+      const boardState = plugin.getInitialBoardState();
+      
+      // Set up column 0 with a valid descending sequence: Red 7, Black 6, Red 5
+      boardState.tableau[0] = [
+        createFaceUpCard('hearts', 'Seven'),
+        createFaceUpCard('clubs', 'Six'), 
+        createFaceUpCard('diamonds', 'Five')
+      ];
+      
+      const maxMovable = plugin.getMaxMovableCards(0, boardState);
+      expect(maxMovable).toBe(3);
+    });
+
+    test('calculates maximum movable cards with face-down cards', () => {
+      const boardState = plugin.getInitialBoardState();
+      
+      // Set up column with face-down card, then valid sequence
+      boardState.tableau[0] = [
+        createFaceDownCard('spades', 'Ten'),
+        createFaceUpCard('hearts', 'Seven'),
+        createFaceUpCard('clubs', 'Six')
+      ];
+      
+      const maxMovable = plugin.getMaxMovableCards(0, boardState);
+      expect(maxMovable).toBe(2); // Only the face-up cards
+    });
+
+    test('calculates maximum movable cards with broken sequence', () => {
+      const boardState = plugin.getInitialBoardState();
+      
+      // Set up column with invalid sequence: Red 7, Red 6 (same color)
+      boardState.tableau[0] = [
+        createFaceUpCard('hearts', 'Seven'),
+        createFaceUpCard('diamonds', 'Six')
+      ];
+      
+      const maxMovable = plugin.getMaxMovableCards(0, boardState);
+      expect(maxMovable).toBe(1); // Only the bottom card can move
+    });
+
+    test('auto-detects card count for tableau-to-tableau moves', () => {
+      const boardState = plugin.getInitialBoardState();
+      
+      // Column 0: Valid sequence Red 7, Black 6, Red 5
+      boardState.tableau[0] = [
+        createFaceUpCard('hearts', 'Seven'),
+        createFaceUpCard('clubs', 'Six'),
+        createFaceUpCard('diamonds', 'Five')
+      ];
+      
+      // Column 1: Black 8 (can accept Red 7)
+      boardState.tableau[1] = [createFaceUpCard('spades', 'Eight')];
+      
+      const move = {
+        action: 'move_card',
+        from: { type: 'tableau', column: 0 },
+        to: { type: 'tableau', column: 1 }
+        // No cardCount specified - should auto-detect
+      };
+      
+      const result = plugin.validateMove(move, boardState, 'player1', mockPlayers);
+      expect(result.valid).toBe(true);
+      expect(move.cardCount).toBe(3); // Should be set by validation
+    });
+
+    test('validates multi-card sequence for tableau moves', () => {
+      const boardState = plugin.getInitialBoardState();
+      
+      // Column 0: Invalid sequence Red 7, Red 6 (same color)
+      boardState.tableau[0] = [
+        createFaceUpCard('hearts', 'Seven'),
+        createFaceUpCard('diamonds', 'Six')
+      ];
+      
+      // Column 1: Black 8
+      boardState.tableau[1] = [createFaceUpCard('spades', 'Eight')];
+      
+      const move = {
+        action: 'move_card',
+        from: { type: 'tableau', column: 0 },
+        to: { type: 'tableau', column: 1 },
+        cardCount: 2 // Explicitly try to move both cards
+      };
+      
+      const result = plugin.validateMove(move, boardState, 'player1', mockPlayers);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid sequence');
+      expect(result.error).toContain('red');
+    });
+
+    test('validates descending rank sequence', () => {
+      const boardState = plugin.getInitialBoardState();
+      
+      // Column 0: Invalid rank sequence Red 7, Black 5 (skips 6)
+      boardState.tableau[0] = [
+        createFaceUpCard('hearts', 'Seven'),
+        createFaceUpCard('clubs', 'Five')
+      ];
+      
+      // Column 1: Black 8
+      boardState.tableau[1] = [createFaceUpCard('spades', 'Eight')];
+      
+      const move = {
+        action: 'move_card',
+        from: { type: 'tableau', column: 0 },
+        to: { type: 'tableau', column: 1 },
+        cardCount: 2
+      };
+      
+      const result = plugin.validateMove(move, boardState, 'player1', mockPlayers);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('expected Six after Seven');
+    });
+
+    test('moves only single card when no valid sequence exists', () => {
+      const boardState = plugin.getInitialBoardState();
+      
+      // Column 0: Multiple cards but no valid sequence
+      boardState.tableau[0] = [
+        createFaceUpCard('hearts', 'King'),
+        createFaceUpCard('diamonds', 'Five'), // Wrong color sequence
+        createFaceUpCard('clubs', 'Three')
+      ];
+      
+      // Column 1: Empty (can accept King)
+      boardState.tableau[1] = [];
+      
+      const move = {
+        action: 'move_card',
+        from: { type: 'tableau', column: 0 },
+        to: { type: 'tableau', column: 1 }
+        // No cardCount - should auto-detect
+      };
+      
+      const result = plugin.validateMove(move, boardState, 'player1', mockPlayers);
+      expect(result.valid).toBe(false); // Three cannot go on empty column
+      expect(move.cardCount).toBe(1); // Should only try to move 1 card
+    });
+
+    test('handles empty columns correctly', () => {
+      const boardState = plugin.getInitialBoardState();
+      boardState.tableau[0] = []; // Empty column
+      
+      const maxMovable = plugin.getMaxMovableCards(0, boardState);
+      expect(maxMovable).toBe(0);
+    });
+
+    test('foundation moves still use single card count', () => {
+      const boardState = plugin.getInitialBoardState();
+      
+      // Column 0: Multiple cards with Ace on bottom
+      boardState.tableau[0] = [
+        createFaceUpCard('hearts', 'Two'),
+        createFaceUpCard('hearts', 'Ace')
+      ];
+      
+      const move = {
+        action: 'move_card',
+        from: { type: 'tableau', column: 0 },
+        to: { type: 'foundation', suit: 'hearts' }
+        // No cardCount - foundation moves should always be 1
+      };
+      
+      const result = plugin.validateMove(move, boardState, 'player1', mockPlayers);
+      expect(result.valid).toBe(true);
+      expect(move.cardCount).toBe(1); // Foundation moves always single card
     });
   });
 
@@ -667,7 +838,7 @@ describe('SolitairePlugin', () => {
       
       const result = plugin.validateMove(move, boardState, 'player1', mockPlayers);
       expect(result.valid).toBe(false);
-      expect(result.error).toContain('descending sequence');
+      expect(result.error).toContain('expected Queen after King');
     });
 
     test('handles partial stock draws', () => {

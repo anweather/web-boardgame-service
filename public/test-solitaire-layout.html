@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solitaire Layout Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Solitaire Layout Test</h1>
+        <p>This page tests the solitaire-specific layout implementation.</p>
+        
+        <div class="alert alert-info">
+            <strong>Test Instructions:</strong>
+            <ol>
+                <li>Go to <a href="/player.html" target="_blank">player.html</a></li>
+                <li>Login as any user (try quick login buttons)</li>
+                <li>Look for or create a solitaire game</li>
+                <li>Verify the visual board interface loads</li>
+                <li><strong>Debug:</strong> Open browser console (F12) to see debugging logs</li>
+                <li>Test pile clicking and multi-card moves</li>
+                <li><strong>Mobile Test:</strong> Try on phone - layout should adapt automatically</li>
+            </ol>
+        </div>
+
+        <div class="alert alert-warning">
+            <strong>If no cards appear:</strong>
+            <ol>
+                <li>Open browser console (F12 → Console tab)</li>
+                <li>Look for messages starting with "Loaded current game:" and "SolitaireLayout.updateBoardState"</li>
+                <li>Check if boardState contains tableau/foundation/stock/waste data</li>
+                <li>Report any errors or unexpected data structures</li>
+            </ol>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5>Traditional Solitaire Layout</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Layout Structure:</h6>
+                        <ul>
+                            <li><strong>Top Left:</strong> Stock pile (click to draw) and Waste pile</li>
+                            <li><strong>Top Right:</strong> Four foundation piles (♥♦♣♠)</li>
+                            <li><strong>Middle:</strong> Seven tableau columns with stacked cards</li>
+                            <li><strong>Visual Cards:</strong> Proper playing card appearance with suits and ranks</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Interaction:</h6>
+                        <ul>
+                            <li><strong>Click Stock:</strong> Draw cards automatically</li>
+                            <li><strong>Click to Select:</strong> Cards and piles highlight</li>
+                            <li><strong>Multi-Card Moves:</strong> Drag sequences in tableau</li>
+                            <li><strong>Visual Feedback:</strong> Green for valid targets, red for invalid</li>
+                        </ul>
+                        
+                        <h6 class="mt-3">Mobile Optimizations:</h6>
+                        <ul>
+                            <li><strong>Adaptive Layout:</strong> Foundations on top, stock below, scrollable tableau</li>
+                            <li><strong>Touch Targets:</strong> 44px minimum for iOS compliance</li>
+                            <li><strong>Simplified Controls:</strong> Essential buttons only</li>
+                            <li><strong>Horizontal Scroll:</strong> Swipe through tableau columns</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5>Shorthand Commands (Now Supported)</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Stock Operations:</strong>
+                        <ul>
+                            <li><code>d</code> - Draw from stock</li>
+                            <li><code>r</code> - Reset stock from waste</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Quick Moves:</strong>
+                        <ul>
+                            <li><code>wh</code> - Waste to hearts foundation</li>
+                            <li><code>1-7</code> - Tableau column 1 to 7</li>
+                            <li><code>f1</code> - Flip card in column 1</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Multi-Card:</strong>
+                        <ul>
+                            <li><code>1-7 x3</code> - Move 3 cards from column 1 to 7</li>
+                            <li><code>2h</code> - Column 2 to hearts foundation</li>
+                            <li><code>w5</code> - Waste to column 5</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <a href="/player.html" class="btn btn-primary">
+                <i class="bi bi-arrow-right"></i> Go to Player Interface
+            </a>
+            <a href="/index.html" class="btn btn-secondary">
+                <i class="bi bi-gear"></i> Admin Panel
+            </a>
+        </div>
+    </div>
+</body>
+</html>

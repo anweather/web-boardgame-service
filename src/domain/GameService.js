@@ -53,7 +53,8 @@ class GameService {
     // Add creator as first player
     await this.addPlayerToGame(savedGame.id, creatorId);
 
-    return savedGame;
+    // Return the updated game state (which may have been started)
+    return await this.gameRepository.findById(savedGame.id);
   }
 
   /**

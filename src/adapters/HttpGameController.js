@@ -5,11 +5,12 @@ const express = require('express');
  * Primary port that handles HTTP requests and delegates to domain services
  */
 class HttpGameController {
-  constructor(gameService, userService, notificationService, imageService) {
+  constructor(gameService, userService, notificationService, imageService, gamePluginRegistry) {
     this.gameService = gameService;
     this.userService = userService;
     this.notificationService = notificationService;
     this.imageService = imageService;
+    this.gamePluginRegistry = gamePluginRegistry;
     this.router = express.Router();
     this._setupRoutes();
   }
@@ -82,6 +83,7 @@ class HttpGameController {
         name: game.name,
         gameType: game.gameType,
         status: game.status,
+        currentPlayerId: game.currentPlayerId,
         moveCount: game.moveCount,
         createdAt: game.createdAt
       });
@@ -134,13 +136,17 @@ class HttpGameController {
 
       const players = await this.gameService.getGamePlayers(game.id);
       
+      // Deserialize board state for response
+      const gamePlugin = this.gamePluginRegistry.getPlugin(game.gameType);
+      const boardState = gamePlugin.deserializeBoardState(game.boardState);
+
       res.json({
         id: game.id,
         name: game.name,
         gameType: game.gameType,
         status: game.status,
         currentPlayerId: game.currentPlayerId,
-        boardState: game.boardState,
+        boardState: boardState,
         moveCount: game.moveCount,
         players: players.map(p => ({
           id: p.id,

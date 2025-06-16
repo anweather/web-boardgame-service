@@ -152,10 +152,23 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
    * Validate moving cards between piles
    */
   validateMoveCard(move, boardState) {
-    const { from, to, cardCount = 1 } = move;
+    let { from, to, cardCount } = move;
 
     if (!from || !to) {
       return { valid: false, error: 'Move must specify from and to locations' };
+    }
+
+    // For tableau-to-tableau moves, auto-detect optimal card count if not specified
+    if (from.type === 'tableau' && to.type === 'tableau' && !cardCount) {
+      cardCount = this.getMaxMovableCards(from.column, boardState);
+      // Update the move object to include the calculated count
+      move.cardCount = cardCount;
+    }
+
+    // Default to 1 card if still not specified
+    if (!cardCount) {
+      cardCount = 1;
+      move.cardCount = cardCount;
     }
 
     // Get source cards
@@ -255,6 +268,50 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
   }
 
   /**
+   * Get the maximum number of cards that can be moved from a tableau column
+   * Returns the count of face-up cards that form a valid descending sequence
+   */
+  getMaxMovableCards(fromColumn, boardState) {
+    const column = boardState.tableau[fromColumn];
+    if (!column || column.length === 0) {
+      return 0;
+    }
+
+    let movableCount = 0;
+    
+    // Start from the bottom (last card) and work backwards
+    for (let i = column.length - 1; i >= 0; i--) {
+      const card = column[i];
+      
+      // Stop if we hit a face-down card
+      if (!card.faceUp) {
+        break;
+      }
+      
+      // First card (bottom of sequence) is always movable if face-up
+      if (i === column.length - 1) {
+        movableCount = 1;
+        continue;
+      }
+      
+      // Check if this card continues the valid descending sequence
+      const nextCard = column[i + 1];
+      const expectedRank = this.getPreviousRank(card.rank);
+      const validRank = nextCard.rank === expectedRank;
+      const validColor = CardUtils.isRed(card) !== CardUtils.isRed(nextCard);
+      
+      if (validRank && validColor) {
+        movableCount++;
+      } else {
+        // Sequence broken, stop here
+        break;
+      }
+    }
+    
+    return movableCount;
+  }
+
+  /**
    * Validate move to tableau column
    */
   validateTableauMove(cardsToMove, to, boardState) {
@@ -278,7 +335,10 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
       const expectedRank = this.getPreviousRank(topCard.rank);
       if (firstCard.rank !== expectedRank) {
         const topCardColor = CardUtils.isRed(topCard) ? 'red' : 'black';
-        return { valid: false, error: `Wrong rank - expected ${expectedRank} on ${topCard.rank}, got ${firstCard.rank} (tableau sequence: K,Q,J,10,9,8,7,6,5,4,3,2,A)` };
+        return { 
+          valid: false, 
+          error: `Cannot place ${firstCard.rank} on ${topCard.rank} - expected ${expectedRank}. Tableau builds down in rank (K→Q→J→10→9→8→7→6→5→4→3→2→A). Check if you have a proper descending sequence to move.` 
+        };
       }
       
       if (CardUtils.isRed(topCard) === CardUtils.isRed(firstCard)) {
@@ -296,11 +356,19 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
         
         const expectedRank = this.getPreviousRank(currentCard.rank);
         if (nextCard.rank !== expectedRank) {
-          return { valid: false, error: 'Cards must be in descending sequence' };
+          return { 
+            valid: false, 
+            error: `Invalid sequence - expected ${expectedRank} after ${currentCard.rank}, got ${nextCard.rank}. Only properly sequenced cards can be moved together.` 
+          };
         }
         
         if (CardUtils.isRed(currentCard) === CardUtils.isRed(nextCard)) {
-          return { valid: false, error: 'Cards must alternate color' };
+          const currentColor = CardUtils.isRed(currentCard) ? 'red' : 'black';
+          const nextColor = CardUtils.isRed(nextCard) ? 'red' : 'black';
+          return { 
+            valid: false, 
+            error: `Invalid sequence - ${currentColor} ${currentCard.rank} followed by ${nextColor} ${nextCard.rank}. Cards must alternate red/black.` 
+          };
         }
       }
     }

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Board Game Service - Test Pages</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .test-card {
+            transition: transform 0.2s;
+        }
+        .test-card:hover {
+            transform: translateY(-2px);
+        }
+        .status-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-flask"></i> Test Pages
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a href="index.html" class="btn btn-outline-light btn-sm me-2">
+                    <i class="bi bi-gear"></i> Admin Panel
+                </a>
+                <a href="player.html" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-controller"></i> Player View
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1><i class="bi bi-flask-fill text-primary"></i> Board Game Service Test Pages</h1>
+                <p class="lead">Testing and debugging tools for the board game service</p>
+            </div>
+        </div>
+
+        <!-- Main Application Pages -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <h2><i class="bi bi-house"></i> Main Application</h2>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card test-card h-100">
+                    <div class="card-body position-relative">
+                        <span class="badge bg-success status-badge">Production</span>
+                        <h5 class="card-title">
+                            <i class="bi bi-gear-fill text-primary"></i> Admin Panel
+                        </h5>
+                        <p class="card-text">
+                            Main admin interface for creating games, managing users, and system overview.
+                        </p>
+                        <ul class="list-unstyled small">
+                            <li>• Create new games (Chess, Checkers, Solitaire)</li>
+                            <li>• View all games and users</li>
+                            <li>• System statistics</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer">
+                        <a href="index.html" class="btn btn-primary">
+                            <i class="bi bi-arrow-right"></i> Open Admin Panel
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card test-card h-100">
+                    <div class="card-body position-relative">
+                        <span class="badge bg-success status-badge">Production</span>
+                        <h5 class="card-title">
+                            <i class="bi bi-controller text-primary"></i> Player View
+                        </h5>
+                        <p class="card-text">
+                            Player interface for joining games, making moves, and playing board games.
+                        </p>
+                        <ul class="list-unstyled small">
+                            <li>• Login/logout functionality</li>
+                            <li>• Join and play games</li>
+                            <li>• Visual solitaire layout</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer">
+                        <a href="player.html" class="btn btn-primary">
+                            <i class="bi bi-arrow-right"></i> Open Player View
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Solitaire Layout Tests -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <h2><i class="bi bi-suit-spade"></i> Solitaire Layout Tests</h2>
+                <p class="text-muted">Testing the new traditional solitaire interface and mobile responsiveness</p>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card test-card h-100">
+                    <div class="card-body position-relative">
+                        <span class="badge bg-warning status-badge">Debug Mode</span>
+                        <h5 class="card-title">
+                            <i class="bi bi-suit-diamond-fill text-danger"></i> Solitaire Layout Test
+                        </h5>
+                        <p class="card-text">
+                            Test the traditional solitaire interface with mobile responsiveness and card rendering.
+                        </p>
+                        <ul class="list-unstyled small">
+                            <li>• Traditional layout structure</li>
+                            <li>• Mobile/desktop responsiveness</li>
+                            <li>• Card display debugging</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer">
+                        <a href="test-solitaire-layout.html" class="btn btn-warning">
+                            <i class="bi bi-bug"></i> Test Solitaire Layout
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card test-card h-100">
+                    <div class="card-body position-relative">
+                        <span class="badge bg-info status-badge">Debug Tool</span>
+                        <h5 class="card-title">
+                            <i class="bi bi-box-arrow-right text-info"></i> Logout Button Test
+                        </h5>
+                        <p class="card-text">
+                            Debug the logout button visibility and functionality in the player interface.
+                        </p>
+                        <ul class="list-unstyled small">
+                            <li>• Button visibility testing</li>
+                            <li>• Mobile/desktop layout check</li>
+                            <li>• Click functionality verification</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer">
+                        <a href="test-logout-button.html" class="btn btn-info">
+                            <i class="bi bi-search"></i> Test Logout Button
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Documentation & Progress -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <h2><i class="bi bi-file-text"></i> Documentation & Progress</h2>
+                <p class="text-muted">Development progress and debugging guides</p>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card test-card h-100">
+                    <div class="card-body position-relative">
+                        <span class="badge bg-secondary status-badge">Reference</span>
+                        <h5 class="card-title">
+                            <i class="bi bi-journal-text text-secondary"></i> Solitaire Progress
+                        </h5>
+                        <p class="card-text">
+                            Complete development progress for the solitaire layout implementation.
+                        </p>
+                        <ul class="list-unstyled small">
+                            <li>• Implementation details</li>
+                            <li>• Current issues and debugging</li>
+                            <li>• Next steps and architecture</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer">
+                        <a href="SOLITAIRE_LAYOUT_PROGRESS.md" class="btn btn-secondary" target="_blank">
+                            <i class="bi bi-file-earmark-text"></i> View Progress
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card test-card h-100">
+                    <div class="card-body position-relative">
+                        <span class="badge bg-secondary status-badge">Debug Guide</span>
+                        <h5 class="card-title">
+                            <i class="bi bi-question-circle text-secondary"></i> Logout Debug Guide
+                        </h5>
+                        <p class="card-text">
+                            Step-by-step debugging guide for logout button visibility issues.
+                        </p>
+                        <ul class="list-unstyled small">
+                            <li>• Troubleshooting steps</li>
+                            <li>• Expected behavior</li>
+                            <li>• Browser console debugging</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer">
+                        <a href="LOGOUT_BUTTON_DEBUG.md" class="btn btn-secondary" target="_blank">
+                            <i class="bi bi-file-earmark-text"></i> View Debug Guide
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h5><i class="bi bi-info-circle"></i> System Information</h5>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6>Game Types</h6>
+                                <ul class="list-unstyled">
+                                    <li><span class="badge bg-success me-2">✓</span> Chess</li>
+                                    <li><span class="badge bg-success me-2">✓</span> Checkers</li>
+                                    <li><span class="badge bg-warning me-2">🔧</span> Solitaire (Layout in progress)</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>Features Status</h6>
+                                <ul class="list-unstyled">
+                                    <li><span class="badge bg-success me-2">✓</span> User Authentication</li>
+                                    <li><span class="badge bg-success me-2">✓</span> Game Creation</li>
+                                    <li><span class="badge bg-success me-2">✓</span> Real-time Updates</li>
+                                    <li><span class="badge bg-warning me-2">🔧</span> Visual Solitaire</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>Testing Status</h6>
+                                <ul class="list-unstyled">
+                                    <li><span class="badge bg-success me-2">✓</span> All automated tests passing</li>
+                                    <li><span class="badge bg-success me-2">✓</span> Mobile responsive design</li>
+                                    <li><span class="badge bg-warning me-2">🔍</span> Debugging card display</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="row mt-4 mb-5">
+            <div class="col-12">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-2">
+                                <a href="player.html?quickLogin=admin" class="btn btn-outline-primary w-100">
+                                    <i class="bi bi-person-circle"></i> Login as Admin
+                                </a>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <button class="btn btn-outline-secondary w-100" onclick="openConsole()">
+                                    <i class="bi bi-terminal"></i> Open Console
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <button class="btn btn-outline-info w-100" onclick="testResponsive()">
+                                    <i class="bi bi-phone"></i> Test Mobile View
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <button class="btn btn-outline-success w-100" onclick="runDiagnostics()">
+                                    <i class="bi bi-check-circle"></i> Run Diagnostics
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function openConsole() {
+            alert('Press F12 to open browser developer console, or right-click → Inspect Element');
+        }
+
+        function testResponsive() {
+            alert('Press F12 → Toggle device toolbar (mobile icon) to test responsive design');
+        }
+
+        function runDiagnostics() {
+            const diagnostics = {
+                'Page Load': 'OK',
+                'Bootstrap CSS': document.querySelector('link[href*="bootstrap"]') ? 'OK' : 'Missing',
+                'Bootstrap Icons': document.querySelector('link[href*="bootstrap-icons"]') ? 'OK' : 'Missing',
+                'Local Storage': typeof(Storage) !== "undefined" ? 'OK' : 'Not supported',
+                'Screen Size': `${window.innerWidth}x${window.innerHeight}`,
+                'User Agent': navigator.userAgent.split(' ')[0]
+            };
+
+            let result = 'System Diagnostics:\\n\\n';
+            for (const [key, value] of Object.entries(diagnostics)) {
+                result += `${key}: ${value}\\n`;
+            }
+
+            alert(result);
+        }
+
+        // Add click tracking for better debugging
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('a[href]')) {
+                console.log('Navigating to:', e.target.closest('a[href]').href);
+            }
+        });
+
+        // Show loading time
+        window.addEventListener('load', function() {
+            console.log('Test index page loaded in', performance.now().toFixed(2), 'ms');
+        });
+    </script>
+</body>
+</html>

@@ -42,19 +42,19 @@ class SolitaireFrontend {
   static parseTextMove(moveText) {
     const cleanMove = moveText.trim().toLowerCase();
 
-    // Stock operations
-    if (cleanMove === 'draw' || cleanMove === 'draw stock') {
+    // Stock operations (including shorthand)
+    if (cleanMove === 'draw' || cleanMove === 'draw stock' || cleanMove === 'd') {
       return { action: 'draw_stock' };
     }
 
-    if (cleanMove === 'reset' || cleanMove === 'reset stock') {
+    if (cleanMove === 'reset' || cleanMove === 'reset stock' || cleanMove === 'r') {
       return { action: 'reset_stock' };
     }
 
-    // Flip card operations
-    let match = cleanMove.match(/^flip\s+tableau\s*(\d+)$/);
+    // Flip card operations (with shorthand: f1, f2, etc.)
+    let match = cleanMove.match(/^(?:flip\s+tableau\s*(\d+)|f(\d+))$/);
     if (match) {
-      const column = parseInt(match[1]) - 1; // Convert to 0-based index
+      const column = parseInt(match[1] || match[2]) - 1;
       if (column < 0 || column > 6) {
         throw new Error('Invalid tableau column (must be 1-7)');
       }
@@ -64,11 +64,16 @@ class SolitaireFrontend {
       };
     }
 
-    // Card move operations
-    // Format: "waste to foundation hearts"
-    match = cleanMove.match(/^waste\s+to\s+foundation\s+(hearts?|diamonds?|clubs?|spades?)$/);
+    // Waste to foundation (shorthand: wh, wd, wc, ws)
+    match = cleanMove.match(/^(?:waste\s+to\s+foundation\s+(hearts?|diamonds?|clubs?|spades?)|w([hdcs]))$/);
     if (match) {
-      const suit = this.normalizeSuit(match[1]);
+      let suit;
+      if (match[1]) {
+        suit = this.normalizeSuit(match[1]);
+      } else {
+        const suitMap = { 'h': 'hearts', 'd': 'diamonds', 'c': 'clubs', 's': 'spades' };
+        suit = suitMap[match[2]];
+      }
       return {
         action: 'move_card',
         from: { type: 'waste' },
@@ -77,14 +82,80 @@ class SolitaireFrontend {
       };
     }
 
-    // Format: "foundation hearts to tableau3"
-    match = cleanMove.match(/^foundation\s+(hearts?|diamonds?|clubs?|spades?)\s+to\s+tableau\s*(\d+)$/);
+    // Tableau to foundation (shorthand: 1h, 2d, 3c, etc.)
+    match = cleanMove.match(/^(?:tableau\s*(\d+)\s+to\s+foundation\s+(hearts?|diamonds?|clubs?|spades?)|(\d+)([hdcs]))$/);
     if (match) {
-      const suit = this.normalizeSuit(match[1]);
-      const column = parseInt(match[2]) - 1;
+      const column = parseInt(match[1] || match[3]) - 1;
       if (column < 0 || column > 6) {
         throw new Error('Invalid tableau column (must be 1-7)');
       }
+      let suit;
+      if (match[2]) {
+        suit = this.normalizeSuit(match[2]);
+      } else {
+        const suitMap = { 'h': 'hearts', 'd': 'diamonds', 'c': 'clubs', 's': 'spades' };
+        suit = suitMap[match[4]];
+      }
+      return {
+        action: 'move_card',
+        from: { type: 'tableau', column },
+        to: { type: 'foundation', suit },
+        cardCount: 1
+      };
+    }
+
+    // Tableau to tableau (shorthand: 1-7, 2-3, etc.)
+    match = cleanMove.match(/^(?:tableau\s*(\d+)\s+to\s+tableau\s*(\d+)(?:\s+x(\d+))?|(\d+)-(\d+)(?:\s*x(\d+))?)$/);
+    if (match) {
+      const fromColumn = parseInt(match[1] || match[4]) - 1;
+      const toColumn = parseInt(match[2] || match[5]) - 1;
+      const cardCount = parseInt(match[3] || match[6] || '1');
+      
+      if (fromColumn < 0 || fromColumn > 6 || toColumn < 0 || toColumn > 6) {
+        throw new Error('Invalid tableau column (must be 1-7)');
+      }
+      
+      return {
+        action: 'move_card',
+        from: { type: 'tableau', column: fromColumn },
+        to: { type: 'tableau', column: toColumn },
+        cardCount
+      };
+    }
+
+    // Waste to tableau (shorthand: w1, w2, etc.)
+    match = cleanMove.match(/^(?:waste\s+to\s+tableau\s*(\d+)|w(\d+))$/);
+    if (match) {
+      const column = parseInt(match[1] || match[2]) - 1;
+      if (column < 0 || column > 6) {
+        throw new Error('Invalid tableau column (must be 1-7)');
+      }
+      return {
+        action: 'move_card',
+        from: { type: 'waste' },
+        to: { type: 'tableau', column },
+        cardCount: 1
+      };
+    }
+
+    // Foundation to tableau (shorthand: h7, d3, etc.)
+    match = cleanMove.match(/^(?:foundation\s+(hearts?|diamonds?|clubs?|spades?)\s+to\s+tableau\s*(\d+)|([hdcs])(\d+))$/);
+    if (match) {
+      let suit;
+      let column;
+      if (match[1]) {
+        suit = this.normalizeSuit(match[1]);
+        column = parseInt(match[2]) - 1;
+      } else {
+        const suitMap = { 'h': 'hearts', 'd': 'diamonds', 'c': 'clubs', 's': 'spades' };
+        suit = suitMap[match[3]];
+        column = parseInt(match[4]) - 1;
+      }
+      
+      if (column < 0 || column > 6) {
+        throw new Error('Invalid tableau column (must be 1-7)');
+      }
+      
       return {
         action: 'move_card',
         from: { type: 'foundation', suit },
@@ -93,7 +164,7 @@ class SolitaireFrontend {
       };
     }
 
-    // Format: "tableau1 to tableau2" or "tableau1 to tableau2 x3"
+    // Legacy support: "tableau1 to tableau2" (long form only)
     match = cleanMove.match(/^tableau\s*(\d+)\s+to\s+tableau\s*(\d+)(?:\s+x(\d+))?$/);
     if (match) {
       const fromColumn = parseInt(match[1]) - 1;
@@ -145,7 +216,7 @@ class SolitaireFrontend {
       };
     }
 
-    throw new Error(`Unrecognized move format: "${moveText}"`);
+    throw new Error(`Unrecognized move format: "${moveText}". Try 'd' for draw, 'wh' for waste to hearts, '1-7' for tableau moves, or 'f1' to flip.`);
   }
 
   /**

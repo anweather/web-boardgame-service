@@ -157,7 +157,8 @@ class DependencyContainer {
         this.getGameService(),
         this.getUserService(),
         this.getNotificationService(),
-        this.getImageService()
+        this.getImageService(),
+        this.getGamePluginRegistry()
       );
       this._instances.set('httpGameController', controller);
     }
