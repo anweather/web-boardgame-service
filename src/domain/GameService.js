@@ -156,14 +156,24 @@ class GameService {
     const players = await this.gameRepository.getPlayers(gameId);
     const currentBoardState = gamePlugin.deserializeBoardState(game.boardState);
 
+    // Parse move if it's a string (for games that support text input like Solitaire)
+    let parsedMove = move;
+    if (typeof move === 'string' && typeof gamePlugin.constructor.parseMove === 'function') {
+      try {
+        parsedMove = gamePlugin.constructor.parseMove(move);
+      } catch (parseError) {
+        throw new Error(`Invalid move format: ${parseError.message}`);
+      }
+    }
+
     // Validate move
-    const validation = gamePlugin.validateMove(move, currentBoardState, playerId, players);
+    const validation = gamePlugin.validateMove(parsedMove, currentBoardState, playerId, players);
     if (!validation.valid) {
       throw new Error(validation.error);
     }
 
     // Apply move
-    const newBoardState = gamePlugin.applyMove(move, currentBoardState, playerId, players);
+    const newBoardState = gamePlugin.applyMove(parsedMove, currentBoardState, playerId, players);
     const serializedNewBoardState = gamePlugin.serializeBoardState(newBoardState);
 
     // Check if game is complete

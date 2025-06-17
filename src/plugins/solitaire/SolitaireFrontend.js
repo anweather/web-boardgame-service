@@ -109,18 +109,24 @@ class SolitaireFrontend {
     if (match) {
       const fromColumn = parseInt(match[1] || match[4]) - 1;
       const toColumn = parseInt(match[2] || match[5]) - 1;
-      const cardCount = parseInt(match[3] || match[6] || '1');
+      const explicitCount = match[3] || match[6]; // Don't default to '1'
       
       if (fromColumn < 0 || fromColumn > 6 || toColumn < 0 || toColumn > 6) {
         throw new Error('Invalid tableau column (must be 1-7)');
       }
       
-      return {
+      const moveObj = {
         action: 'move_card',
         from: { type: 'tableau', column: fromColumn },
-        to: { type: 'tableau', column: toColumn },
-        cardCount
+        to: { type: 'tableau', column: toColumn }
       };
+      
+      // Only set cardCount if explicitly specified
+      if (explicitCount) {
+        moveObj.cardCount = parseInt(explicitCount);
+      }
+      
+      return moveObj;
     }
 
     // Waste to tableau (shorthand: w1, w2, etc.)
@@ -169,18 +175,24 @@ class SolitaireFrontend {
     if (match) {
       const fromColumn = parseInt(match[1]) - 1;
       const toColumn = parseInt(match[2]) - 1;
-      const cardCount = match[3] ? parseInt(match[3]) : 1;
+      const explicitCount = match[3];
 
       if (fromColumn < 0 || fromColumn > 6 || toColumn < 0 || toColumn > 6) {
         throw new Error('Invalid tableau column (must be 1-7)');
       }
 
-      return {
+      const moveObj = {
         action: 'move_card',
         from: { type: 'tableau', column: fromColumn },
-        to: { type: 'tableau', column: toColumn },
-        cardCount
+        to: { type: 'tableau', column: toColumn }
       };
+      
+      // Only set cardCount if explicitly specified
+      if (explicitCount) {
+        moveObj.cardCount = parseInt(explicitCount);
+      }
+      
+      return moveObj;
     }
 
     // Format: "tableau3 to foundation spades"

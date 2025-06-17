@@ -63,7 +63,8 @@ class CardUtils {
    * @returns {boolean} True if card is red
    */
   static isRed(card) {
-    return card.color === 'red';
+    // Use color property if available, otherwise derive from suit
+    return card.color === 'red' || (card.color === undefined && this.SUIT_COLORS[card.suit] === 'red');
   }
 
   /**
@@ -72,7 +73,8 @@ class CardUtils {
    * @returns {boolean} True if card is black
    */
   static isBlack(card) {
-    return card.color === 'black';
+    // Use color property if available, otherwise derive from suit
+    return card.color === 'black' || (card.color === undefined && this.SUIT_COLORS[card.suit] === 'black');
   }
 
   /**

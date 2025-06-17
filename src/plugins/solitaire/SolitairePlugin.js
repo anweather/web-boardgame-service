@@ -159,14 +159,14 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
     }
 
     // For tableau-to-tableau moves, auto-detect optimal card count if not specified
-    if (from.type === 'tableau' && to.type === 'tableau' && !cardCount) {
-      cardCount = this.getMaxMovableCards(from.column, boardState);
+    if (from.type === 'tableau' && to.type === 'tableau' && cardCount === undefined) {
+      cardCount = this.getOptimalMoveCount(from.column, to.column, boardState);
       // Update the move object to include the calculated count
       move.cardCount = cardCount;
     }
 
-    // Default to 1 card if still not specified
-    if (!cardCount) {
+    // Default to 1 card if still not specified (but not for tableau-to-tableau moves)
+    if (cardCount === undefined) {
       cardCount = 1;
       move.cardCount = cardCount;
     }
@@ -265,6 +265,61 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
     }
 
     return { valid: true };
+  }
+
+  /**
+   * Get the optimal number of cards to move between tableau columns
+   * Considers both source sequence validity and destination placement rules
+   */
+  getOptimalMoveCount(fromColumn, toColumn, boardState) {
+    const maxMovable = this.getMaxMovableCards(fromColumn, boardState);
+    if (maxMovable === 0) {
+      return 0;
+    }
+
+    const sourceColumn = boardState.tableau[fromColumn];
+    const targetColumn = boardState.tableau[toColumn];
+    
+    // Try different card counts from max down to 1 to find the best valid move
+    for (let cardCount = maxMovable; cardCount >= 1; cardCount--) {
+      const cardsToMove = sourceColumn.slice(-cardCount);
+      
+      // Check if this move would be valid at the destination
+      if (this.isValidTableauPlacement(cardsToMove, targetColumn)) {
+        return cardCount;
+      }
+    }
+    
+    return 0; // No valid move found
+  }
+
+  /**
+   * Check if a set of cards can be validly placed on a tableau column
+   */
+  isValidTableauPlacement(cardsToMove, targetColumn) {
+    if (!cardsToMove || cardsToMove.length === 0) {
+      return false;
+    }
+
+    const firstCard = cardsToMove[0];
+    
+    if (targetColumn.length === 0) {
+      // Empty column can only accept King
+      return firstCard.rank === 'King';
+    } else {
+      // Must be descending rank and alternating color
+      const topCard = targetColumn[targetColumn.length - 1];
+      
+      if (!topCard.faceUp) {
+        return false; // Cannot place on face-down card
+      }
+      
+      const expectedRank = this.getPreviousRank(topCard.rank);
+      const validRank = firstCard.rank === expectedRank;
+      const validColor = CardUtils.isRed(topCard) !== CardUtils.isRed(firstCard);
+      
+      return validRank && validColor;
+    }
   }
 
   /**
@@ -716,6 +771,64 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
       case 'foundation': return `${location.suit} foundation`;
       case 'tableau': return `tableau column ${(location.column || 0) + 1}`;
       default: return location.type;
+    }
+  }
+
+  /**
+   * Parse move from user input (frontend interface)
+   * @param {string|Object} moveInput - Raw user input
+   * @returns {Object} - Parsed move object for backend processing
+   */
+  static parseMove(moveInput) {
+    try {
+      const SolitaireFrontend = require('./SolitaireFrontend');
+      return SolitaireFrontend.parseMove(moveInput);
+    } catch (error) {
+      throw new Error(`Invalid move format: ${error.message}`);
+    }
+  }
+
+  /**
+   * Format move data for display (frontend interface)
+   * @param {Object} moveData - Move data from backend
+   * @returns {string} - Formatted move text for display
+   */
+  static formatMove(moveData) {
+    try {
+      const SolitaireFrontend = require('./SolitaireFrontend');
+      return SolitaireFrontend.formatMove(moveData);
+    } catch (error) {
+      return 'Unknown move';
+    }
+  }
+
+  /**
+   * Get placeholder text for move input field
+   * @returns {string} - Placeholder text
+   */
+  static getMoveInputPlaceholder() {
+    return 'e.g., d, wh, 1-7, 1-7 x3, f1';
+  }
+
+  /**
+   * Get help text for move input
+   * @returns {string} - Help text explaining move format
+   */
+  static getMoveInputHelp() {
+    return 'Commands: d=draw, r=reset, wh=waste to hearts, 1-7=move cards (auto-detects max), 1-7 x3=move 3 cards, f1=flip tableau 1';
+  }
+
+  /**
+   * Validate move format before sending to backend
+   * @param {string} moveText - Raw user input
+   * @returns {Object} - {valid: boolean, error?: string}
+   */
+  static validateMoveFormat(moveText) {
+    try {
+      this.parseMove(moveText);
+      return { valid: true };
+    } catch (error) {
+      return { valid: false, error: error.message };
     }
   }
 
