@@ -1,0 +1,1158 @@
+openapi: 3.0.0
+info:
+  title: Correspondence Board Game API
+  description: REST API for managing asynchronous correspondence board games
+  version: 1.0.0
+  contact:
+    name: Board Game API
+    url: https://github.com/yourusername/correspondence-board-game
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+  - url: https://your-production-domain.com/api
+    description: Production server
+
+paths:
+  # Games API
+  /games:
+    get:
+      summary: Get all games
+      description: Retrieve a list of all games, optionally filtered by status or game type
+      tags:
+        - Games
+      parameters:
+        - name: status
+          in: query
+          description: Filter games by status
+          required: false
+          schema:
+            type: string
+            enum: [waiting, active, completed, cancelled]
+        - name: gameType
+          in: query
+          description: Filter games by game type
+          required: false
+          schema:
+            type: string
+            enum: [chess, checkers, hearts, solitaire]
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of games per page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+      responses:
+        '200':
+          description: Successfully retrieved games
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Game'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Create a new game
+      description: Create a new game with specified settings
+      tags:
+        - Games
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - gameType
+                - creatorId
+              properties:
+                name:
+                  type: string
+                  description: Name of the game
+                  example: "Chess Match #1"
+                gameType:
+                  type: string
+                  enum: [chess, checkers, hearts, solitaire]
+                  description: Type of game to create
+                  example: "chess"
+                creatorId:
+                  type: string
+                  description: ID of the user creating the game
+                  example: "user-123"
+                settings:
+                  type: object
+                  description: Additional game settings (game-specific)
+                  example: {}
+      responses:
+        '201':
+          description: Game created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '400':
+          description: Bad request - missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /games/{gameId}:
+    get:
+      summary: Get game details
+      description: Retrieve detailed information about a specific game
+      tags:
+        - Games
+      parameters:
+        - name: gameId
+          in: path
+          required: true
+          description: Unique identifier of the game
+          schema:
+            type: string
+            example: "game-123"
+      responses:
+        '200':
+          description: Successfully retrieved game details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /games/{gameId}/join:
+    post:
+      summary: Join a game
+      description: Add a player to a game that is waiting for players
+      tags:
+        - Games
+      parameters:
+        - name: gameId
+          in: path
+          required: true
+          description: Unique identifier of the game
+          schema:
+            type: string
+            example: "game-123"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: string
+                  description: ID of the user joining the game
+                  example: "user-456"
+      responses:
+        '200':
+          description: Successfully joined game
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '400':
+          description: Bad request - user already in game or game full
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /games/{gameId}/move:
+    post:
+      summary: Make a move in a game
+      description: Submit a move for the current player in an active game
+      tags:
+        - Games
+      parameters:
+        - name: gameId
+          in: path
+          required: true
+          description: Unique identifier of the game
+          schema:
+            type: string
+            example: "game-123"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - move
+              properties:
+                userId:
+                  type: string
+                  description: ID of the user making the move
+                  example: "user-123"
+                move:
+                  type: object
+                  description: Game-specific move data
+                  example: {"from": "e2", "to": "e4"}
+      responses:
+        '200':
+          description: Move made successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  newBoardState:
+                    type: object
+                    description: Updated board state after the move
+                  moveCount:
+                    type: integer
+                    description: Total number of moves in the game
+                  isGameComplete:
+                    type: boolean
+                    description: Whether the game has ended
+                  winner:
+                    type: string
+                    description: ID of the winner (if game is complete)
+                    nullable: true
+        '400':
+          description: Bad request - invalid move or not player's turn
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /games/{gameId}/image:
+    get:
+      summary: Get game board image
+      description: Retrieve a visual representation of the game board as a PNG image
+      tags:
+        - Games
+      parameters:
+        - name: gameId
+          in: path
+          required: true
+          description: Unique identifier of the game
+          schema:
+            type: string
+            example: "game-123"
+        - name: width
+          in: query
+          description: Width of the generated image in pixels
+          required: false
+          schema:
+            type: integer
+            minimum: 100
+            maximum: 2000
+            default: 800
+        - name: height
+          in: query
+          description: Height of the generated image in pixels
+          required: false
+          schema:
+            type: integer
+            minimum: 100
+            maximum: 2000
+            default: 800
+      responses:
+        '200':
+          description: Successfully generated board image
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /games/{gameId}/moves:
+    get:
+      summary: Get game move history
+      description: Retrieve the complete move history for a game
+      tags:
+        - Games
+      parameters:
+        - name: gameId
+          in: path
+          required: true
+          description: Unique identifier of the game
+          schema:
+            type: string
+            example: "game-123"
+      responses:
+        '200':
+          description: Successfully retrieved move history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GameMove'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /games/{gameId}/force-start:
+    post:
+      summary: Force start a game (Admin)
+      description: Force start a game that is waiting for players (admin feature)
+      tags:
+        - Games
+        - Admin
+      parameters:
+        - name: gameId
+          in: path
+          required: true
+          description: Unique identifier of the game
+          schema:
+            type: string
+            example: "game-123"
+      responses:
+        '200':
+          description: Game started successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '400':
+          description: Bad request - game cannot be started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Users API
+  /users:
+    get:
+      summary: Get all users (Admin)
+      description: Retrieve a list of all registered users (admin feature)
+      tags:
+        - Users
+        - Admin
+      responses:
+        '200':
+          description: Successfully retrieved users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserWithStats'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/register:
+    post:
+      summary: Register a new user
+      description: Create a new user account
+      tags:
+        - Users
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - email
+                - password
+              properties:
+                username:
+                  type: string
+                  description: Unique username for the user
+                  example: "player123"
+                email:
+                  type: string
+                  format: email
+                  description: Email address of the user
+                  example: "player123@example.com"
+                password:
+                  type: string
+                  description: Password for the user account
+                  example: "securepassword123"
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+                    description: JWT authentication token
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        '400':
+          description: Bad request - missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict - username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/login:
+    post:
+      summary: Login user
+      description: Authenticate a user and receive a JWT token
+      tags:
+        - Users
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  description: Username of the user
+                  example: "player123"
+                password:
+                  type: string
+                  description: Password of the user
+                  example: "securepassword123"
+      responses:
+        '200':
+          description: User logged in successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+                    description: JWT authentication token
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        '400':
+          description: Bad request - missing username or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/{userId}:
+    get:
+      summary: Get user profile
+      description: Retrieve detailed information about a specific user
+      tags:
+        - Users
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: Unique identifier of the user
+          schema:
+            type: string
+            example: "user-123"
+      responses:
+        '200':
+          description: Successfully retrieved user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/{userId}/games:
+    get:
+      summary: Get user's games
+      description: Retrieve all games that a user has participated in
+      tags:
+        - Users
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: Unique identifier of the user
+          schema:
+            type: string
+            example: "user-123"
+      responses:
+        '200':
+          description: Successfully retrieved user's games
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserGame'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/{userId}/notifications:
+    get:
+      summary: Get user's notifications
+      description: Retrieve notifications for a specific user
+      tags:
+        - Users
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: Unique identifier of the user
+          schema:
+            type: string
+            example: "user-123"
+        - name: limit
+          in: query
+          description: Maximum number of notifications to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          description: Number of notifications to skip
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Successfully retrieved notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/notifications/{notificationId}/read:
+    put:
+      summary: Mark notification as read
+      description: Mark a specific notification as read
+      tags:
+        - Users
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          description: Unique identifier of the notification
+          schema:
+            type: string
+            example: "notification-123"
+      responses:
+        '200':
+          description: Notification marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Notification marked as read"
+        '404':
+          description: Notification not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Game Types API
+  /game-types:
+    get:
+      summary: Get all game types
+      description: Retrieve all supported game types from the plugin system
+      tags:
+        - Game Types
+      responses:
+        '200':
+          description: Successfully retrieved game types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GameType'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /game-types/{gameType}:
+    get:
+      summary: Get game type information
+      description: Retrieve detailed information about a specific game type
+      tags:
+        - Game Types
+      parameters:
+        - name: gameType
+          in: path
+          required: true
+          description: Type of game
+          schema:
+            type: string
+            enum: [chess, checkers, hearts, solitaire]
+            example: "chess"
+      responses:
+        '200':
+          description: Successfully retrieved game type information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameType'
+        '404':
+          description: Game type not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /game-types/{gameType}/validate:
+    post:
+      summary: Validate game configuration
+      description: Validate game configuration settings for a specific game type
+      tags:
+        - Game Types
+      parameters:
+        - name: gameType
+          in: path
+          required: true
+          description: Type of game
+          schema:
+            type: string
+            enum: [chess, checkers, hearts, solitaire]
+            example: "chess"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                settings:
+                  type: object
+                  description: Game-specific configuration settings
+                  example: {"timeLimit": 300, "difficulty": "normal"}
+      responses:
+        '200':
+          description: Configuration validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                    description: Whether the configuration is valid
+                    example: true
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                    description: List of validation errors (if any)
+                    example: []
+        '404':
+          description: Game type not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Admin API
+  /admin/purge:
+    post:
+      summary: Purge database (Admin)
+      description: Delete all games, moves, and non-admin users from the database
+      tags:
+        - Admin
+      responses:
+        '200':
+          description: Database purged successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Database purged successfully"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Game:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the game
+          example: "game-123"
+        name:
+          type: string
+          description: Name of the game
+          example: "Chess Match #1"
+        gameType:
+          type: string
+          enum: [chess, checkers, hearts, solitaire]
+          description: Type of game
+          example: "chess"
+        status:
+          type: string
+          enum: [waiting, active, completed, cancelled]
+          description: Current status of the game
+          example: "active"
+        createdAt:
+          type: string
+          format: date-time
+          description: When the game was created
+          example: "2023-12-01T10:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: When the game was last updated
+          example: "2023-12-01T11:30:00Z"
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/GamePlayer'
+          description: Players in the game
+        maxPlayers:
+          type: integer
+          description: Maximum number of players for this game type
+          example: 2
+        currentPlayerId:
+          type: string
+          description: ID of the player whose turn it is
+          example: "user-123"
+          nullable: true
+        moveCount:
+          type: integer
+          description: Total number of moves made in the game
+          example: 15
+        boardState:
+          type: object
+          description: Current state of the game board
+          example: {}
+        moves:
+          type: array
+          items:
+            $ref: '#/components/schemas/GameMove'
+          description: Move history (optional, included in some responses)
+
+    GamePlayer:
+      type: object
+      properties:
+        userId:
+          type: string
+          description: Unique identifier of the user
+          example: "user-123"
+        username:
+          type: string
+          description: Username of the player
+          example: "player1"
+        color:
+          type: string
+          description: Player's color/side in the game
+          example: "white"
+          nullable: true
+        joinedAt:
+          type: string
+          format: date-time
+          description: When the player joined the game
+          example: "2023-12-01T10:05:00Z"
+
+    GameMove:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the move
+          example: "move-123"
+        gameId:
+          type: string
+          description: ID of the game this move belongs to
+          example: "game-123"
+        playerId:
+          type: string
+          description: ID of the player who made the move
+          example: "user-123"
+        player:
+          $ref: '#/components/schemas/GamePlayer'
+        move:
+          type: object
+          description: Game-specific move data
+          example: {"from": "e2", "to": "e4"}
+        moveNumber:
+          type: integer
+          description: Sequential number of the move in the game
+          example: 1
+        timestamp:
+          type: string
+          format: date-time
+          description: When the move was made
+          example: "2023-12-01T10:10:00Z"
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the user
+          example: "user-123"
+        username:
+          type: string
+          description: Username of the user
+          example: "player1"
+        email:
+          type: string
+          format: email
+          description: Email address of the user
+          example: "player1@example.com"
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          description: When the user account was created
+          example: "2023-11-01T09:00:00Z"
+
+    UserWithStats:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            lastActive:
+              type: string
+              format: date-time
+              description: When the user was last active
+              example: "2023-12-01T10:00:00Z"
+              nullable: true
+            gamesPlayed:
+              type: integer
+              description: Total number of games the user has played
+              example: 5
+
+    UserGame:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the game
+          example: "game-123"
+        name:
+          type: string
+          description: Name of the game
+          example: "Chess Match #1"
+        gameType:
+          type: string
+          enum: [chess, checkers, hearts, solitaire]
+          description: Type of game
+          example: "chess"
+        status:
+          type: string
+          enum: [waiting, active, completed, cancelled]
+          description: Current status of the game
+          example: "active"
+        currentPlayerId:
+          type: string
+          description: ID of the player whose turn it is
+          example: "user-123"
+          nullable: true
+        moveCount:
+          type: integer
+          description: Total number of moves made in the game
+          example: 15
+        playerOrder:
+          type: integer
+          description: This user's turn order in the game
+          example: 1
+        color:
+          type: string
+          description: This user's color/side in the game
+          example: "white"
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          description: When the game was created
+          example: "2023-12-01T10:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: When the game was last updated
+          example: "2023-12-01T11:30:00Z"
+
+    GameType:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Unique identifier for the game type
+          example: "chess"
+        name:
+          type: string
+          description: Display name of the game type
+          example: "Chess"
+        description:
+          type: string
+          description: Description of the game type
+          example: "Classic chess game for two players"
+        minPlayers:
+          type: integer
+          description: Minimum number of players required
+          example: 2
+        maxPlayers:
+          type: integer
+          description: Maximum number of players allowed
+          example: 2
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the notification
+          example: "notification-123"
+        type:
+          type: string
+          description: Type of notification
+          example: "game-move"
+        message:
+          type: string
+          description: Notification message
+          example: "It's your turn in Chess Match #1"
+        read:
+          type: boolean
+          description: Whether the notification has been read
+          example: false
+        gameId:
+          type: string
+          description: ID of the related game (if applicable)
+          example: "game-123"
+          nullable: true
+        gameName:
+          type: string
+          description: Name of the related game (if applicable)
+          example: "Chess Match #1"
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          description: When the notification was created
+          example: "2023-12-01T10:15:00Z"
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Game not found"
+        code:
+          type: string
+          description: Error code (optional)
+          example: "GAME_NOT_FOUND"
+        details:
+          type: object
+          description: Additional error details (optional)
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login endpoint
+
+tags:
+  - name: Games
+    description: Game management operations
+  - name: Users
+    description: User management and authentication
+  - name: Game Types
+    description: Game type information and validation
+  - name: Admin
+    description: Administrative operations
+  - name: Authentication
+    description: User authentication operations

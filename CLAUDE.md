@@ -111,3 +111,7 @@ Game state stored as JSON in database. Board rendering uses SVG converted to PNG
 - Run test suite if available: `npm test`
 - Check basic functionality works
 - Ensure no import/syntax errors
+
+## Development Memories
+- The node server will always be running with npm run dev mode. You don't need to run start or restart the server. It will automatically pick up any changes
+- The backend server is always running

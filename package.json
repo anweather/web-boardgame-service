@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "build:frontend": "cd frontend && npm run build",
+    "dev:frontend": "npm run build:frontend && npm run dev",
     "test": "jest tests/blackbox-simple.test.js",
     "test:architecture": "jest tests/architecture.test.js",
     "test:all": "jest",
@@ -24,6 +26,8 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
     "bcryptjs": "^2.4.3",
     "cards": "^2.0.3",
     "chess.js": "^1.3.1",
@@ -33,6 +37,9 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.1",
     "sharp": "^0.33.1",
     "socket.io": "^4.7.4",
     "sqlite3": "^5.1.6",

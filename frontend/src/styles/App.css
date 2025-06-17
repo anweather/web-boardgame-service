@@ -1,0 +1,142 @@
+/* App-wide styles */
+
+.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  padding-bottom: 2rem;
+}
+
+/* Custom styles for game components */
+.game-card {
+  transition: transform 0.2s ease;
+}
+
+.game-card:hover {
+  transform: translateY(-2px);
+}
+
+/* Board image styling */
+.board-image {
+  max-width: 100%;
+  width: 100%;
+  min-width: 300px;
+  height: auto;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+/* Move input styling */
+.move-input {
+  font-family: 'Courier New', monospace;
+}
+
+/* Move history styling */
+.move-history {
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+
+/* Navigation improvements */
+.navbar-brand {
+  font-weight: bold;
+}
+
+/* Status indicators */
+.badge.bg-success {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+/* Card enhancements */
+.card {
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+/* Table styling */
+.table-responsive {
+  border-radius: 0.375rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.table {
+  margin-bottom: 0;
+  background-color: white;
+}
+
+.table thead th {
+  border-top: none;
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+/* Current turn highlighting */
+.current-turn {
+  background-color: #fff3cd;
+  border-left: 4px solid #ffc107;
+}
+
+/* Error and success states */
+.alert {
+  border-radius: 0.375rem;
+  border: none;
+}
+
+/* Loading states */
+.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .navbar-brand {
+    font-size: 1rem;
+  }
+  
+  .main-content {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  
+  .card-body h2 {
+    font-size: 1.5rem;
+  }
+  
+  .table-responsive {
+    font-size: 0.875rem;
+  }
+}
+
+/* Game room specific styles */
+.game-room {
+  min-height: calc(100vh - 200px);
+}
+
+/* Admin panel specific styles */
+.admin-sidebar {
+  background-color: #f8f9fa;
+  border-radius: 0.375rem;
+  padding: 1rem;
+}
+
+/* Player interface styles */
+.player-info {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}

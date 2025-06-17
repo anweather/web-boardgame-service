@@ -39,8 +39,22 @@ app.use(cors());
 app.use(morgan('combined'));
 app.use(express.json());
 
-// Serve static files from public directory
-app.use(express.static('public'));
+// Serve static files from public directory (original vanilla JS app)
+app.use('/vanilla', express.static('public'));
+
+// Serve React app static files
+const path = require('path');
+const fs = require('fs');
+const reactBuildPath = path.join(__dirname, '..', 'frontend', 'build');
+
+// Check if React build exists
+if (fs.existsSync(reactBuildPath)) {
+  console.log('React build found, serving React app');
+  app.use(express.static(reactBuildPath));
+} else {
+  console.log('React build not found, serving vanilla app only');
+  app.use(express.static('public'));
+}
 
 // Rate limiting - more lenient for development
 const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -163,9 +177,21 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Route not found' });
+// Serve React app for all non-API routes (SPA routing)
+app.get('*', (req, res) => {
+  // Skip API routes
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API route not found' });
+  }
+  
+  // Check if React build exists
+  const reactIndexPath = path.join(reactBuildPath, 'index.html');
+  if (fs.existsSync(reactIndexPath)) {
+    res.sendFile(reactIndexPath);
+  } else {
+    // Fallback to vanilla app
+    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  }
 });
 
 const PORT = process.env.PORT || 3000;
