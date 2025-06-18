@@ -51,8 +51,27 @@ class SolitaireFrontend {
       return { action: 'reset_stock' };
     }
 
+    // Single column number move (1, 2, 3, etc.) - attempts to move to best foundation
+    let match = cleanMove.match(/^(\d+)$/);
+    if (match) {
+      const column = parseInt(match[1]) - 1;
+      if (column >= 0 && column <= 6) {
+        return {
+          action: 'auto_move_column',
+          from: { type: 'tableau', column }
+        };
+      }
+    }
+
+    // Waste card move ("w") - attempts to move waste card to best foundation
+    if (cleanMove === 'w') {
+      return {
+        action: 'auto_move_waste'
+      };
+    }
+
     // Flip card operations (with shorthand: f1, f2, etc.)
-    let match = cleanMove.match(/^(?:flip\s+tableau\s*(\d+)|f(\d+))$/);
+    match = cleanMove.match(/^(?:flip\s+tableau\s*(\d+)|f(\d+))$/);
     if (match) {
       const column = parseInt(match[1] || match[2]) - 1;
       if (column < 0 || column > 6) {
@@ -109,7 +128,7 @@ class SolitaireFrontend {
     if (match) {
       const fromColumn = parseInt(match[1] || match[4]) - 1;
       const toColumn = parseInt(match[2] || match[5]) - 1;
-      const explicitCount = match[3] || match[6]; // Don't default to '1'
+      const explicitCount = match[3] || match[6];
       
       if (fromColumn < 0 || fromColumn > 6 || toColumn < 0 || toColumn > 6) {
         throw new Error('Invalid tableau column (must be 1-7)');
@@ -121,10 +140,15 @@ class SolitaireFrontend {
         to: { type: 'tableau', column: toColumn }
       };
       
-      // Only set cardCount if explicitly specified
-      if (explicitCount) {
+      // Set cardCount: 1 for long form, or explicitly specified count, or undefined for short form auto-detection
+      if (match[1] && match[2]) {
+        // Long form: "tableau X to tableau Y" - always set cardCount to 1 or explicit
+        moveObj.cardCount = explicitCount ? parseInt(explicitCount) : 1;
+      } else if (explicitCount) {
+        // Short form with explicit count: "X-Y xN"
         moveObj.cardCount = parseInt(explicitCount);
       }
+      // Short form without explicit count: "X-Y" - leave undefined for auto-detection
       
       return moveObj;
     }
@@ -184,13 +208,9 @@ class SolitaireFrontend {
       const moveObj = {
         action: 'move_card',
         from: { type: 'tableau', column: fromColumn },
-        to: { type: 'tableau', column: toColumn }
+        to: { type: 'tableau', column: toColumn },
+        cardCount: explicitCount ? parseInt(explicitCount) : 1
       };
-      
-      // Only set cardCount if explicitly specified
-      if (explicitCount) {
-        moveObj.cardCount = parseInt(explicitCount);
-      }
       
       return moveObj;
     }
@@ -299,6 +319,12 @@ class SolitaireFrontend {
 
       case 'flip_card':
         return `Flip card in tableau ${(from.column || 0) + 1}`;
+
+      case 'auto_move_column':
+        return `Auto-move from tableau ${(from.column || 0) + 1} to foundation`;
+
+      case 'auto_move_waste':
+        return 'Auto-move from waste to foundation';
 
       case 'move_card': {
         const fromText = this.formatLocation(from);

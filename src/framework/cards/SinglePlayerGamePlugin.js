@@ -74,7 +74,8 @@ class SinglePlayerGamePlugin extends GamePlugin {
       timeStarted: Date.now(),
       timeElapsed: 0,
       bonuses: [],
-      penalties: []
+      penalties: [],
+      events: []
     };
   }
 
@@ -121,6 +122,18 @@ class SinglePlayerGamePlugin extends GamePlugin {
         
       case 'time_update':
         newScore.timeElapsed = Date.now() - newScore.timeStarted;
+        break;
+        
+      case 'completion':
+        newScore.points += scoreEvent.pointsAwarded;
+        if (scoreEvent.description) {
+          newScore.events.push({
+            type: 'completion',
+            points: scoreEvent.pointsAwarded,
+            description: scoreEvent.description,
+            timestamp: Date.now()
+          });
+        }
         break;
         
       default:

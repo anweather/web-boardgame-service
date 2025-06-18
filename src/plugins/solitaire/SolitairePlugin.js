@@ -120,6 +120,12 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
       case 'flip_card':
         return this.validateFlipCard(move, boardState);
       
+      case 'auto_move_column':
+        return this.validateAutoMoveColumn(move, boardState);
+      
+      case 'auto_move_waste':
+        return this.validateAutoMoveWaste(move, boardState);
+      
       default:
         return { valid: false, error: `Unknown action: ${action}` };
     }
@@ -130,7 +136,11 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
    */
   validateDrawStock(boardState) {
     if (boardState.stock.length === 0) {
-      return { valid: false, error: 'Stock pile is empty - no more cards to draw. Try "r" to reset from waste pile' };
+      // Auto-reshuffle if waste pile has cards
+      if (boardState.waste.length > 0) {
+        return { valid: true, autoReshuffle: true };
+      }
+      return { valid: false, error: 'Stock pile is empty and waste pile is empty - no more cards to draw' };
     }
     return { valid: true };
   }
@@ -161,6 +171,10 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
     // For tableau-to-tableau moves, auto-detect optimal card count if not specified
     if (from.type === 'tableau' && to.type === 'tableau' && cardCount === undefined) {
       cardCount = this.getOptimalMoveCount(from.column, to.column, boardState);
+      // If auto-detection finds no valid move (returns 0), default to 1 card for better error messages
+      if (cardCount === 0) {
+        cardCount = 1;
+      }
       // Update the move object to include the calculated count
       move.cardCount = cardCount;
     }
@@ -226,6 +240,81 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
     }
 
     return { valid: true };
+  }
+
+  /**
+   * Validate auto-move from tableau column to best foundation
+   */
+  validateAutoMoveColumn(move, boardState) {
+    const { from } = move;
+    
+    if (!from || from.type !== 'tableau' || from.column < 0 || from.column > 6) {
+      return { valid: false, error: 'Invalid tableau column' };
+    }
+
+    const column = boardState.tableau[from.column];
+    if (!column || column.length === 0) {
+      return { valid: false, error: `Tableau column ${from.column + 1} is empty - no cards to move` };
+    }
+
+    const topCard = column[column.length - 1];
+    if (!topCard.faceUp) {
+      return { valid: false, error: `Card in tableau ${from.column + 1} is face-down - flip it first with "f${from.column + 1}"` };
+    }
+
+    // Find the best foundation for this card
+    const targetSuit = topCard.suit;
+    const foundationPile = boardState.foundation[targetSuit];
+    
+    if (foundationPile.length === 0) {
+      // Foundation must start with Ace
+      if (topCard.rank !== 'Ace') {
+        return { valid: false, error: `Cannot move ${topCard.rank} of ${topCard.suit} to foundation - foundation piles must start with Ace` };
+      }
+    } else {
+      // Must be next rank in sequence
+      const topFoundationCard = foundationPile[foundationPile.length - 1];
+      const expectedRank = this.getNextRank(topFoundationCard.rank);
+      if (topCard.rank !== expectedRank) {
+        return { valid: false, error: `Cannot move ${topCard.rank} of ${topCard.suit} to foundation - expected ${expectedRank} after ${topFoundationCard.rank}` };
+      }
+    }
+
+    return { valid: true, targetSuit };
+  }
+
+  /**
+   * Validate auto-move from waste to best foundation
+   */
+  validateAutoMoveWaste(move, boardState) {
+    if (boardState.waste.length === 0) {
+      return { valid: false, error: 'Waste pile is empty - no cards to move' };
+    }
+
+    const topCard = boardState.waste[boardState.waste.length - 1];
+    if (!topCard.faceUp) {
+      return { valid: false, error: 'Top waste card is face-down - this should not happen' };
+    }
+
+    // Find the best foundation for this card
+    const targetSuit = topCard.suit;
+    const foundationPile = boardState.foundation[targetSuit];
+    
+    if (foundationPile.length === 0) {
+      // Foundation must start with Ace
+      if (topCard.rank !== 'Ace') {
+        return { valid: false, error: `Cannot move ${topCard.rank} of ${topCard.suit} to foundation - foundation piles must start with Ace` };
+      }
+    } else {
+      // Must be next rank in sequence
+      const topFoundationCard = foundationPile[foundationPile.length - 1];
+      const expectedRank = this.getNextRank(topFoundationCard.rank);
+      if (topCard.rank !== expectedRank) {
+        return { valid: false, error: `Cannot move ${topCard.rank} of ${topCard.suit} to foundation - expected ${expectedRank} after ${topFoundationCard.rank}` };
+      }
+    }
+
+    return { valid: true, targetSuit };
   }
 
   /**
@@ -451,7 +540,7 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
 
     switch (action) {
       case 'draw_stock':
-        this.applyDrawStock(newBoardState);
+        this.applyDrawStock(newBoardState, move);
         break;
       
       case 'reset_stock':
@@ -464,6 +553,14 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
       
       case 'flip_card':
         this.applyFlipCard(move, newBoardState);
+        break;
+      
+      case 'auto_move_column':
+        this.applyAutoMoveColumn(move, newBoardState);
+        break;
+      
+      case 'auto_move_waste':
+        this.applyAutoMoveWaste(move, newBoardState);
         break;
     }
 
@@ -479,7 +576,13 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
   /**
    * Apply drawing cards from stock
    */
-  applyDrawStock(boardState) {
+  applyDrawStock(boardState, move) {
+    // Check if we need to auto-reshuffle
+    if (boardState.stock.length === 0 && boardState.waste.length > 0) {
+      // Auto-reshuffle waste back to stock
+      this.applyResetStock(boardState);
+    }
+    
     const drawCount = Math.min(boardState.stockDrawCount, boardState.stock.length);
     const drawnCards = boardState.stock.splice(-drawCount, drawCount);
     
@@ -526,6 +629,36 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
   }
 
   /**
+   * Apply auto-move from tableau column to foundation
+   */
+  applyAutoMoveColumn(move, boardState) {
+    const { from } = move;
+    const column = boardState.tableau[from.column];
+    const topCard = column[column.length - 1];
+    const targetSuit = topCard.suit;
+    
+    // Remove card from tableau
+    column.pop();
+    
+    // Add card to foundation
+    boardState.foundation[targetSuit].push(topCard);
+  }
+
+  /**
+   * Apply auto-move from waste to foundation
+   */
+  applyAutoMoveWaste(move, boardState) {
+    const topCard = boardState.waste[boardState.waste.length - 1];
+    const targetSuit = topCard.suit;
+    
+    // Remove card from waste
+    boardState.waste.pop();
+    
+    // Add card to foundation
+    boardState.foundation[targetSuit].push(topCard);
+  }
+
+  /**
    * Check if the game is complete (all cards in foundation)
    */
   isGameComplete(boardState, players) {
@@ -549,6 +682,26 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
       return players[0].user_id || players[0].userId;
     }
     return null;
+  }
+
+  /**
+   * Handle game completion - extension point for custom completion logic
+   * @param {Object} boardState - Final board state
+   * @param {Array} players - Game players
+   * @param {string|null} winner - Winner ID
+   */
+  async onGameComplete(boardState, players, winner) {
+    // Calculate final score with completion bonus
+    if (boardState.score && winner) {
+      const completionBonus = this.getCompletionBonus(boardState, boardState.score);
+      boardState.score = this.updateScore(boardState.score, {
+        type: 'completion',
+        pointsAwarded: completionBonus,
+        description: 'Game completion bonus'
+      });
+
+      console.log(`Solitaire game completed! Player ${winner} final score: ${boardState.score.points}`);
+    }
   }
 
   /**
@@ -693,6 +846,10 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
         return { type: 'penalty', points: 100, penaltyType: 'stock_reset', 
                 description: 'Stock pile reset penalty' };
       
+      case 'auto_move_column':
+      case 'auto_move_waste':
+        return { type: 'move', pointsAwarded: 10 }; // Points for foundation move
+      
       default:
         return { type: 'move', pointsAwarded: 0 };
     }
@@ -807,7 +964,7 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
    * @returns {string} - Placeholder text
    */
   static getMoveInputPlaceholder() {
-    return 'e.g., d, wh, 1-7, 1-7 x3, f1';
+    return 'e.g., d, w, 1, 2, wh, 1-7, f1';
   }
 
   /**
@@ -815,7 +972,7 @@ class SolitairePlugin extends SinglePlayerGamePlugin {
    * @returns {string} - Help text explaining move format
    */
   static getMoveInputHelp() {
-    return 'Commands: d=draw, r=reset, wh=waste to hearts, 1-7=move cards (auto-detects max), 1-7 x3=move 3 cards, f1=flip tableau 1';
+    return 'Commands: d=draw (auto-reshuffles), w=waste to foundation, 1-7=column to foundation, 1-7=move cards, f1=flip tableau 1';
   }
 
   /**

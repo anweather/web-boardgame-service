@@ -174,7 +174,7 @@ class GameService {
 
     // Apply move
     const newBoardState = gamePlugin.applyMove(parsedMove, currentBoardState, playerId, players);
-    const serializedNewBoardState = gamePlugin.serializeBoardState(newBoardState);
+    let serializedNewBoardState = gamePlugin.serializeBoardState(newBoardState);
 
     // Check if game is complete
     const isGameComplete = gamePlugin.isGameComplete(newBoardState, players);
@@ -183,22 +183,44 @@ class GameService {
 
     if (isGameComplete) {
       winner = gamePlugin.getWinner(newBoardState, players);
+      
+      // Allow plugin to perform custom completion logic
+      if (typeof gamePlugin.onGameComplete === 'function') {
+        try {
+          await gamePlugin.onGameComplete(newBoardState, players, winner);
+          // Re-serialize board state after plugin modifications
+          serializedNewBoardState = gamePlugin.serializeBoardState(newBoardState);
+        } catch (error) {
+          console.warn('Plugin onGameComplete failed:', error.message);
+        }
+      }
+      
       updatedGame = game.complete(winner);
+      // Ensure the final board state includes any plugin modifications
+      updatedGame = new Game({
+        ...updatedGame,
+        boardState: serializedNewBoardState
+      });
     } else {
       const nextPlayerId = gamePlugin.getNextPlayer(playerId, players, newBoardState);
       updatedGame = game.makeMove(nextPlayerId, serializedNewBoardState);
     }
 
-    // Save move and update game
-    await this.gameRepository.saveMove(
-      gameId,
-      playerId,
-      move,
-      serializedNewBoardState,
-      game.moveCount + 1
-    );
+    try {
+      // Always use separate operations for now to debug the completion issue
+      await this.gameRepository.saveMove(
+        gameId,
+        playerId,
+        move,
+        serializedNewBoardState,
+        game.moveCount + 1
+      );
 
-    await this.gameRepository.update(gameId, updatedGame.toObject());
+      await this.gameRepository.update(gameId, updatedGame.toObject());
+    } catch (error) {
+      console.error('Error saving move and updating game:', error);
+      throw new Error(`Failed to save move: ${error.message}`);
+    }
 
     // Send notifications
     if (isGameComplete) {
@@ -239,7 +261,7 @@ class GameService {
         username: p.username,
         playerOrder: p.player_order,
         color: p.color,
-        playerData: p.player_data ? JSON.parse(p.player_data) : {}
+        playerData: p.player_data || {}
       })),
       boardState,
       renderData: gamePlugin.getRenderData(boardState, players),

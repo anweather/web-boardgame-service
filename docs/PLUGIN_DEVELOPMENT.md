@@ -1,14 +1,34 @@
 # Game Plugin Development Guide
 
-This guide explains how to create new game types for the Web Board Game Service using the plugin architecture.
+This guide explains how to create new game types for the Correspondence Board Game Service using the plugin architecture.
 
 ## Overview
 
-The Web Board Game Service uses a modular plugin architecture that allows developers to add new game types without modifying the core application. Each game plugin provides:
+The Correspondence Board Game Service uses a modular plugin architecture that allows developers to add new game types without modifying the core application. Each game plugin provides:
 
 - **Backend Logic**: Game rules, move validation, state management
 - **Frontend Logic**: Move parsing, formatting, user interface helpers  
 - **Rendering**: Board/game visualization as SVG and PNG images
+- **Extension Points**: Hooks for custom game completion logic and events
+
+## Architecture Models
+
+The framework supports different game types through specialized base classes:
+
+### Single-Player Games
+- **Base Class**: `SinglePlayerGamePlugin`
+- **Examples**: Solitaire, Puzzle games
+- **Features**: Built-in scoring system, time tracking, completion bonuses
+
+### Multi-Player Games  
+- **Base Class**: `GamePlugin` 
+- **Examples**: Chess, Checkers, Hearts
+- **Features**: Turn management, player coordination, multiplayer notifications
+
+### Card Games
+- **Framework**: `CardFramework`
+- **Components**: `DeckManager`, `CardUtils`, `CardRenderer`
+- **Features**: Standard card handling, shuffling, validation
 
 ## Plugin Architecture
 
@@ -35,96 +55,96 @@ src/plugins/
 
 ## Creating a New Game Plugin
 
-### Step 1: Main Plugin Class
+### Step 1: Choose Base Class
 
-Create `src/plugins/your-game/YourGamePlugin.js`:
+Select the appropriate base class for your game type:
+
+#### For Single-Player Games (like Solitaire):
+
+```javascript
+const SinglePlayerGamePlugin = require('../../framework/cards/SinglePlayerGamePlugin');
+
+class YourSolitairePlugin extends SinglePlayerGamePlugin {
+  static getMetadata() {
+    return {
+      name: 'Your Solitaire Game',
+      description: 'Description of your solitaire variant',
+      minPlayers: 1,
+      maxPlayers: 1,
+      estimatedDuration: '5-15 minutes',
+      complexity: 'Medium',
+      categories: ['Solitaire', 'Card Game', 'Single Player'],
+      version: '1.0.0'
+    };
+  }
+
+  getGameType() { return 'your-solitaire'; }
+  getDisplayName() { return 'Your Solitaire Game'; }
+  
+  getInitialBoardState(gameSettings = {}) {
+    // Use card framework utilities
+    const deck = DeckManager.createStandardDeck({ shuffled: true });
+    
+    return {
+      // Your specific solitaire layout
+      tableau: this.dealTableau(deck),
+      foundation: this.initFoundation(),
+      stock: deck.remaining,
+      waste: [],
+      score: this.initializeScore(), // Inherited scoring system
+      moves: []
+    };
+  }
+
+  // Extension point for game completion bonuses
+  async onGameComplete(boardState, players, winner) {
+    if (boardState.score && winner) {
+      const completionBonus = this.getCompletionBonus(boardState, boardState.score);
+      boardState.score = this.updateScore(boardState.score, {
+        type: 'completion',
+        pointsAwarded: completionBonus,
+        description: 'Game completion bonus'
+      });
+    }
+  }
+}
+```
+
+#### For Multi-Player Games (like Chess):
 
 ```javascript
 const GamePlugin = require('../../ports/GamePlugin');
-const YourGameFrontend = require('./YourGameFrontend');
-const YourGameRenderer = require('./YourGameRenderer');
 
-class YourGamePlugin extends GamePlugin {
+class YourBoardGamePlugin extends GamePlugin {
   static getMetadata() {
     return {
-      name: 'Your Game',
-      description: 'Description of your game',
+      name: 'Your Board Game',
+      description: 'Description of your board game',
       minPlayers: 2,
       maxPlayers: 4,
-      estimatedDuration: '15-30 minutes',
+      estimatedDuration: '30-60 minutes',
       complexity: 'Medium',
       categories: ['Strategy', 'Board Game'],
       version: '1.0.0'
     };
   }
 
-  // Required backend methods
-  getGameType() { return 'your-game'; }
-  getDisplayName() { return 'Your Game'; }
-  getDescription() { return 'Description of your game'; }
-  getMinPlayers() { return 2; }
-  getMaxPlayers() { return 4; }
-
   getInitialBoardState(gameSettings = {}) {
     return {
-      // Define your initial game state
-      board: [], // or whatever structure your game needs
+      board: this.createInitialBoard(),
       currentPlayer: 0,
-      round: 1
+      round: 1,
+      gamePhase: 'setup' // setup, playing, endgame
     };
   }
 
-  validateMove(move, boardState, playerId, players) {
-    // Implement move validation logic
-    // Return { valid: true } or { valid: false, error: 'Error message' }
-  }
-
-  applyMove(move, boardState, playerId, players) {
-    // Apply the move to the board state
-    // Return new board state
-  }
-
-  isGameComplete(boardState, players) {
-    // Check if game is finished
-    // Return boolean
-  }
-
-  getWinner(boardState, players) {
-    // Return winner player ID, array of IDs, or null for draw
-  }
-
   getNextPlayer(currentPlayerId, players, boardState) {
-    // Return next player ID in turn order
-  }
-
-  // Frontend method delegations
-  static parseMove(moveText) {
-    return YourGameFrontend.parseMove(moveText);
-  }
-
-  static formatMove(moveData) {
-    return YourGameFrontend.formatMove(moveData);
-  }
-
-  static getMoveInputPlaceholder() {
-    return YourGameFrontend.getMoveInputPlaceholder();
-  }
-
-  static getMoveInputHelp() {
-    return YourGameFrontend.getMoveInputHelp();
-  }
-
-  // Rendering method delegations
-  static async generateBoardImage(boardState, options = {}) {
-    return await YourGameRenderer.generateBoardImage(boardState, options);
-  }
-
-  static createBoardSVG(boardState, options = {}) {
-    return YourGameRenderer.createBoardSVG(boardState, options);
+    // Implement turn order logic
+    const currentIndex = players.findIndex(p => p.user_id === currentPlayerId);
+    const nextIndex = (currentIndex + 1) % players.length;
+    return players[nextIndex].user_id;
   }
 }
-
-module.exports = YourGamePlugin;
 ```
 
 ### Step 2: Frontend Module
@@ -336,6 +356,96 @@ serializeBoardState(state)        // Serialize state for storage
 deserializeBoardState(data)       // Deserialize state from storage
 ```
 
+### Extension Points
+
+The framework provides hooks for custom game logic:
+
+#### Game Completion Hook
+
+```javascript
+// Optional: Called when game completes
+async onGameComplete(boardState, players, winner) {
+  // Custom completion logic
+  // - Calculate final scores/bonuses
+  // - Update achievements 
+  // - Log game statistics
+  // - Trigger external events
+  
+  // Example: Add completion bonus for single-player games
+  if (boardState.score && winner) {
+    const bonus = this.calculateCompletionBonus(boardState);
+    boardState.score = this.updateScore(boardState.score, {
+      type: 'completion',
+      pointsAwarded: bonus,
+      description: 'Game completion bonus'
+    });
+  }
+}
+```
+
+#### Move Validation Hooks
+
+```javascript
+// Optional: Custom validation before standard checks
+preValidateMove(move, boardState, playerId, players) {
+  // Return { valid: true } or { valid: false, error: 'message' }
+  // Called before main validateMove()
+}
+
+// Optional: Custom validation after standard checks  
+postValidateMove(move, boardState, playerId, players, result) {
+  // Modify or enhance validation result
+  // Return modified result object
+}
+```
+
+#### Scoring System (Single-Player Games)
+
+```javascript
+// Built-in score event types:
+// - 'move': Points for making moves
+// - 'penalty': Point deductions  
+// - 'completion': Game completion bonus
+// - 'time_update': Update elapsed time
+
+// Custom scoring example:
+getMoveScoreEvent(move, oldState, newState) {
+  switch (move.action) {
+    case 'special_move':
+      return { type: 'move', pointsAwarded: 50 };
+    case 'bonus_action':
+      return { type: 'move', pointsAwarded: 100, description: 'Bonus!' };
+    default:
+      return { type: 'move', pointsAwarded: 0 };
+  }
+}
+```
+
+### Card Game Framework
+
+For card-based games, use the specialized framework:
+
+```javascript
+const { DeckManager, CardUtils } = require('../../framework/cards');
+
+// Deck creation and management
+const deck = DeckManager.createStandardDeck({ shuffled: true });
+const customDeck = DeckManager.createCustomDeck(cardDefinitions);
+
+// Card utilities
+const isRed = CardUtils.isRed(card);        // Check if card is red
+const isBlack = CardUtils.isBlack(card);    // Check if card is black  
+const getSuit = CardUtils.getSuit(card);    // Get card suit
+const getRank = CardUtils.getRank(card);    // Get card rank
+const getValue = CardUtils.getValue(card);  // Get numeric value
+
+// Deck operations
+deck.shuffle();                    // Shuffle deck
+const card = deck.draw();         // Draw single card
+const cards = deck.draw(5);       // Draw multiple cards
+deck.addCard(card);               // Add card back to deck
+```
+
 ### Required Static Methods (Frontend)
 
 ```javascript
@@ -381,14 +491,59 @@ ImageRenderer.createErrorImage(message, options)
 3. **Frontend Testing**: Test move parsing and formatting
 4. **Rendering Tests**: Verify image generation works
 
+## Recent Framework Enhancements
+
+### Game Completion Improvements
+
+The framework now provides robust game completion handling:
+
+1. **Atomic Transactions**: Move saving and game updates happen atomically to prevent data corruption
+2. **Extension Points**: Plugins can implement `onGameComplete()` for custom completion logic  
+3. **Enhanced Error Handling**: Better error messages and transaction rollback on failures
+4. **Completion Bonuses**: Built-in support for completion scoring in single-player games
+
+### Solitaire Enhancements
+
+Recent improvements to solitaire games include:
+
+1. **Auto-Move Commands**: 
+   - Column numbers (`"1"`, `"2"`, etc.) auto-move cards to foundation
+   - `"w"` command auto-moves waste card to appropriate foundation
+   
+2. **Auto-Reshuffle**: 
+   - `"d"` command automatically reshuffles deck when stock is empty
+   
+3. **Improved Move Parsing**:
+   - Smart detection of optimal card counts for tableau moves
+   - Better error messages for invalid moves
+   
+4. **Enhanced Scoring**:
+   - Completion bonuses based on time and move efficiency
+   - Detailed score event tracking
+
+### Database Reliability
+
+Enhanced database operations for better reliability:
+
+```javascript
+// Atomic move + game update (in SqliteGameRepository)
+await gameRepository.saveMoveAndUpdateGame(
+  gameId, playerId, move, newBoardState, moveCount, gameUpdates
+);
+
+// Automatic transaction handling with rollback on errors
+```
+
 ## Best Practices
 
 1. **Error Handling**: Always validate inputs and handle errors gracefully
-2. **Performance**: Keep move validation fast for real-time gameplay
+2. **Performance**: Keep move validation fast for real-time gameplay  
 3. **Consistency**: Use the common framework utilities for styling
 4. **Documentation**: Document your game rules and move formats
 5. **Validation**: Implement thorough move and state validation
 6. **Fallbacks**: Provide sensible defaults and error recovery
+7. **Extension Points**: Use `onGameComplete()` for custom completion logic
+8. **Atomic Operations**: Use atomic database operations when available
 
 ## Example: Adding Tic-Tac-Toe
 

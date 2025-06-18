@@ -283,7 +283,8 @@ class SqliteGameRepository extends GameRepository {
         moveNumber
       ], function(err) {
         if (err) {
-          reject(err);
+          console.error('Error saving move:', err);
+          reject(new Error(`Failed to save move: ${err.message}`));
         } else {
           resolve({
             id: moveId,
@@ -293,6 +294,105 @@ class SqliteGameRepository extends GameRepository {
             boardStateAfter: boardStateJson,
             moveNumber,
             timestamp: new Date().toISOString()
+          });
+        }
+      });
+    });
+  }
+
+  async saveMoveAndUpdateGame(gameId, playerId, move, boardStateAfter, moveNumber, gameUpdates) {
+    const db = getDatabase();
+    
+    return new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        
+        let moveError = null;
+        let updateError = null;
+        
+        // Save move first
+        const moveId = uuidv4();
+        const boardStateJson = typeof boardStateAfter === 'string' 
+          ? boardStateAfter 
+          : JSON.stringify(boardStateAfter);
+        
+        const moveQuery = `
+          INSERT INTO moves (id, game_id, user_id, move_notation, board_state_after, move_number)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `;
+
+        db.run(moveQuery, [
+          moveId,
+          gameId,
+          playerId,
+          JSON.stringify(move),
+          boardStateJson,
+          moveNumber
+        ], function(err) {
+          if (err) {
+            moveError = err;
+          }
+        });
+
+        // Update game
+        const fields = [];
+        const params = [];
+
+        Object.keys(gameUpdates).forEach(key => {
+          if (key === 'settings') {
+            fields.push('settings = ?');
+            params.push(JSON.stringify(gameUpdates[key]));
+          } else if (key === 'boardState') {
+            fields.push('board_state = ?');
+            params.push(typeof gameUpdates[key] === 'string' ? gameUpdates[key] : JSON.stringify(gameUpdates[key]));
+          } else if (key === 'currentPlayerId') {
+            fields.push('current_player_id = ?');
+            params.push(gameUpdates[key]);
+          } else if (key === 'moveCount') {
+            fields.push('move_count = ?');
+            params.push(gameUpdates[key]);
+          } else if (key === 'status') {
+            fields.push('status = ?');
+            params.push(gameUpdates[key]);
+          } else {
+            fields.push(`${key} = ?`);
+            params.push(gameUpdates[key]);
+          }
+        });
+
+        fields.push('updated_at = CURRENT_TIMESTAMP');
+        params.push(gameId);
+
+        const updateQuery = `UPDATE games SET ${fields.join(', ')} WHERE id = ?`;
+
+        db.run(updateQuery, params, function(err) {
+          if (err) {
+            updateError = err;
+          }
+        });
+
+        // Commit or rollback
+        if (moveError || updateError) {
+          db.run('ROLLBACK', () => {
+            const error = moveError || updateError;
+            console.error('Transaction failed:', error);
+            reject(new Error(`Transaction failed: ${error.message}`));
+          });
+        } else {
+          db.run('COMMIT', (err) => {
+            if (err) {
+              reject(new Error(`Commit failed: ${err.message}`));
+            } else {
+              resolve({
+                moveId,
+                gameId,
+                playerId,
+                move,
+                boardStateAfter: boardStateJson,
+                moveNumber,
+                timestamp: new Date().toISOString()
+              });
+            }
           });
         }
       });
